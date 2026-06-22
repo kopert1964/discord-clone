@@ -24,7 +24,9 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
-    password TEXT
+    password TEXT,
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_online INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS servers (
@@ -101,8 +103,22 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Неверный логин или пароль' });
   }
   
+  // Обновляем статус онлайн
+  db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+  
   const token = jwt.sign({ id: user.id, username: user.username }, SECRET);
   res.json({ token, user: { id: user.id, username: user.username } });
+});
+
+// ========== ПОЛУЧЕНИЕ СТАТУСА ПОЛЬЗОВАТЕЛЯ ==========
+app.get('/user/status/:userId', (req, res) => {
+  const stmt = db.prepare('SELECT is_online, last_seen FROM users WHERE id = ?');
+  const user = stmt.get(req.params.userId);
+  if (user) {
+    res.json(user);
+  } else {
+    res.status(404).json({ error: 'Пользователь не найден' });
+  }
 });
 
 // ========== СЕРВЕРА ==========
@@ -203,7 +219,7 @@ app.get('/messages/:channelId', (req, res) => {
 // ========== ДРУЗЬЯ ==========
 app.get('/users/search', (req, res) => {
   const { q } = req.query;
-  const stmt = db.prepare('SELECT id, username FROM users WHERE username LIKE ? LIMIT 10');
+  const stmt = db.prepare('SELECT id, username, is_online, last_seen FROM users WHERE username LIKE ? LIMIT 10');
   res.json(stmt.all(`%${q}%`));
 });
 
@@ -227,7 +243,7 @@ app.post('/friends/accept', (req, res) => {
 
 app.get('/friends/:userId', (req, res) => {
   const stmt = db.prepare(`
-    SELECT u.id, u.username, f.status 
+    SELECT u.id, u.username, u.is_online, u.last_seen, f.status 
     FROM friends f
     JOIN users u ON (u.id = f.friend_id OR u.id = f.user_id)
     WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted' AND u.id != ?
@@ -278,6 +294,10 @@ io.on('connection', (socket) => {
 
   socket.on('join', ({ userId, username }) => {
     onlineUsers[socket.id] = { userId, username, socketId: socket.id };
+    
+    // Обновляем статус в базе данных
+    db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
+    
     io.emit('users', Object.values(onlineUsers));
     console.log(`✅ ${username} онлайн`);
   });
@@ -336,12 +356,13 @@ io.on('connection', (socket) => {
       voiceRooms[roomName] = [];
     }
     
-    // Удаляем если уже есть
     voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
     voiceRooms[roomName].push({ userId, username, socketId: socket.id });
     
-    // Отправляем всем в комнате обновлённый список
     io.to(roomName).emit('voice-users', voiceRooms[roomName]);
+    
+    // Отправляем существующих пользователей новому участнику
+    socket.emit('voice-existing-users', voiceRooms[roomName].filter(u => u.userId !== userId));
     
     console.log(`🎤 ${username} вошёл в голосовой канал ${channelId}`);
   });
@@ -373,7 +394,7 @@ io.on('connection', (socket) => {
     io.to(to).emit('voice-ice', { from: socket.id, candidate });
   });
 
-  // ===== ЛИЧНЫЕ ЗВОНКИ =====
+  // ===== ЛИЧНЫЕ ЗВОНКИ (ИСПРАВЛЕННАЯ ЛОГИКА) =====
   socket.on('call-user', ({ to, fromUsername }) => {
     io.to(to).emit('incoming-call', {
       from: socket.id,
@@ -386,13 +407,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('call-reject', ({ to }) => {
-    io.to(to).emit('call-failed', { reason: 'Пользователь отклонил звонок' });
+    io.to(to).emit('call-rejected', { from: socket.id });
   });
 
   socket.on('call-end', ({ to }) => {
-    io.to(to).emit('call-ended');
+    io.to(to).emit('call-ended', { from: socket.id });
   });
 
+  // Важно: передача offer/answer строго по назначению
   socket.on('call-offer', ({ to, offer }) => {
     io.to(to).emit('call-offer', { from: socket.id, offer });
   });
@@ -409,6 +431,9 @@ io.on('connection', (socket) => {
     const user = onlineUsers[socket.id];
     if (user) {
       console.log(`❌ ${user.username} вышел`);
+      
+      // Обновляем статус в базе данных
+      db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.userId);
       
       // Удаляем из голосовых комнат
       for (const roomName in voiceRooms) {

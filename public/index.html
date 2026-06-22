@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>💬 Discord Clone - Полноценные звонки</title>
+  <title>💬 Discord Clone - Звонки работают</title>
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -74,22 +74,7 @@
       display: flex; justify-content: space-between; align-items: center;
     }
     .voice-channel-item:hover { background: var(--bg-hover); }
-    .voice-channel-item .voice-users {
-      font-size: 11px; color: var(--text-muted);
-    }
-    .voice-channel-item .voice-users .user-badge {
-      display: inline-block; background: var(--bg-active);
-      padding: 2px 8px; border-radius: 12px; margin: 2px;
-      font-size: 10px;
-    }
-    .voice-channel-item .voice-users .user-badge.speaking {
-      border: 2px solid var(--green);
-      animation: pulse-border 0.5s infinite;
-    }
-    @keyframes pulse-border {
-      0%, 100% { border-color: var(--green); opacity: 1; }
-      50% { border-color: transparent; opacity: 0.5; }
-    }
+    .voice-channel-item .voice-users { font-size: 11px; color: var(--text-muted); }
 
     .online-user {
       padding: 6px 10px; border-radius: 8px;
@@ -97,7 +82,9 @@
     }
     .online-user:hover { background: var(--bg-hover); }
     .online-user .user-info { display: flex; align-items: center; gap: 8px; }
-    .online-user .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .online-user .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .online-user .status-dot.online { background: var(--green); }
+    .online-user .status-dot.offline { background: var(--text-muted); }
     .online-user .btn-call {
       background: var(--green); border: none; padding: 2px 10px; border-radius: 6px;
       cursor: pointer; font-weight: 700; font-size: 11px; color: #0f0f1a;
@@ -108,6 +95,11 @@
       padding: 6px 10px; border-radius: 8px;
     }
     .friend-item:hover { background: var(--bg-hover); }
+    .friend-item .friend-status {
+      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    }
+    .friend-item .friend-status.online { background: var(--green); color: #0f0f1a; }
+    .friend-item .friend-status.offline { background: var(--bg-active); color: var(--text-muted); }
     .friend-item .friend-actions { display: flex; gap: 4px; }
     .friend-item .friend-actions button {
       padding: 2px 10px; border: none; border-radius: 6px; cursor: pointer;
@@ -170,7 +162,7 @@
     }
     @keyframes callIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
     #call-window .caller-avatar { 
-      font-size: 80px; display: block; margin-bottom: 8px;
+      font-size: 80px; display: block;
       width: 120px; height: 120px; line-height: 120px;
       border-radius: 50%; background: var(--bg-active);
       margin: 0 auto 16px; font-weight: 700;
@@ -195,7 +187,7 @@
     .btn-cancel { background: var(--yellow); color: #0f0f1a; }
 
     .voice-indicator {
-      display: inline-block; width: 16px; height: 16px; 
+      display: inline-block; width: 12px; height: 12px; 
       border-radius: 50%; margin-left: 8px; vertical-align: middle;
     }
     .voice-indicator.speaking { 
@@ -237,6 +229,8 @@
     }
     .call-status-indicator .dot.connected { background: var(--green); animation: pulse 1s infinite; }
     .call-status-indicator .dot.ringing { background: var(--yellow); animation: pulse 0.5s infinite; }
+
+    .last-seen { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
   </style>
 </head>
 <body>
@@ -348,8 +342,6 @@ let currentMelody = 1;
 // ============================================================
 //  ЗВУКИ И МЕЛОДИИ
 // ============================================================
-
-// Мелодия 1: Классический телефонный звонок
 function playMelody1() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -375,15 +367,10 @@ function playMelody1() {
       time += note.duration;
     });
     
-    setTimeout(() => {
-      ctx.close();
-    }, 1000);
-  } catch(e) {
-    console.error('Melody error:', e);
-  }
+    setTimeout(() => ctx.close(), 1000);
+  } catch(e) {}
 }
 
-// Мелодия 2: Приятный перезвон
 function playMelody2() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -409,13 +396,10 @@ function playMelody2() {
       time += note.dur;
     });
     
-    setTimeout(() => {
-      ctx.close();
-    }, 1000);
+    setTimeout(() => ctx.close(), 1000);
   } catch(e) {}
 }
 
-// Мелодия 3: Современный рингтон
 function playMelody3() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -437,16 +421,13 @@ function playMelody3() {
       time += durations[i];
     });
     
-    setTimeout(() => {
-      ctx.close();
-    }, 1000);
+    setTimeout(() => ctx.close(), 1000);
   } catch(e) {}
 }
 
 function playRingtone() {
   stopRingtone();
   
-  // Чередуем разные мелодии
   switch(currentMelody) {
     case 1:
       playMelody1();
@@ -462,7 +443,6 @@ function playRingtone() {
       break;
   }
   
-  // Меняем мелодию для следующего раза
   currentMelody = currentMelody % 3 + 1;
 }
 
@@ -473,7 +453,6 @@ function stopRingtone() {
   }
 }
 
-// Звук подключения
 function playConnectSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -492,7 +471,6 @@ function playConnectSound() {
   } catch(e) {}
 }
 
-// Звук отключения
 function playDisconnectSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -547,9 +525,7 @@ function startAudioVisualization(stream) {
         bar.style.height = height + 'px';
       });
     }, 100);
-  } catch(e) {
-    console.error('Visualization error:', e);
-  }
+  } catch(e) {}
 }
 
 function stopAudioVisualization() {
@@ -559,13 +535,24 @@ function stopAudioVisualization() {
   }
   
   const visualizer = document.getElementById('audio-visualizer');
-  if (visualizer) {
-    visualizer.innerHTML = '';
-  }
+  if (visualizer) visualizer.innerHTML = '';
   
-  if (audioAnalyser) {
-    audioAnalyser = null;
-  }
+  audioAnalyser = null;
+}
+
+// ============================================================
+//  ФОРМАТИРОВАНИЕ ВРЕМЕНИ
+// ============================================================
+function formatLastSeen(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now - date) / 1000);
+  
+  if (diff < 60) return 'был(а) только что';
+  if (diff < 3600) return `был(а) ${Math.floor(diff / 60)} мин. назад`;
+  if (diff < 86400) return `был(а) ${Math.floor(diff / 3600)} ч. назад`;
+  return `был(а) ${date.toLocaleDateString()}`;
 }
 
 // ============================================================
@@ -653,13 +640,15 @@ function initSocket() {
     list.innerHTML = users.filter(u => u.userId !== currentUser.id).map(u => `
       <div class="online-user" data-socketid="${u.socketId}" data-userid="${u.userId}" data-username="${u.username}">
         <div class="user-info">
-          <span class="status-dot"></span>
+          <span class="status-dot online"></span>
           ${u.username}
-          <span class="voice-indicator silent" id="voice-indicator-${u.userId}"></span>
         </div>
-        <button class="btn-call" onclick="startCall('${u.socketId}', '${u.username}')">📞 Позвонить</button>
+        <button class="btn-call" onclick="startCall('${u.socketId}', '${u.username}')">📞</button>
       </div>
     `).join('');
+    
+    // Обновляем статусы друзей
+    loadFriends();
   });
 
   socket.on('message', addMessage);
@@ -691,39 +680,44 @@ function initSocket() {
     await handleVoiceICE(from, candidate);
   });
 
-  // ===== ЛИЧНЫЕ ЗВОНКИ =====
+  // ===== ЛИЧНЫЕ ЗВОНКИ (ИСПРАВЛЕНО) =====
   socket.on('incoming-call', (data) => {
+    console.log('📞 Входящий звонок от:', data.fromUsername);
     currentCallerId = data.from;
     currentCallerUsername = data.fromUsername || 'Неизвестный';
     playRingtone();
     showCallWindow('incoming');
   });
 
-  socket.on('call-connected', () => {
+  socket.on('call-connected', (data) => {
+    console.log('✅ Звонок подключен');
     stopRingtone();
     playConnectSound();
     startTimer();
     showCallWindow('active');
   });
 
-  socket.on('call-failed', (data) => {
+  socket.on('call-rejected', (data) => {
+    console.log('❌ Звонок отклонен');
     stopRingtone();
     playDisconnectSound();
-    alert('❌ ' + (data.reason || 'Не удалось дозвониться'));
     endCall();
   });
 
-  socket.on('call-ended', () => {
+  socket.on('call-ended', (data) => {
+    console.log('📴 Звонок завершен');
     stopRingtone();
     playDisconnectSound();
     endCall();
   });
 
   socket.on('call-offer', async ({ from, offer }) => {
+    console.log('📨 Получен offer от:', from);
     await handleCallOffer(from, offer);
   });
 
   socket.on('call-answer', async ({ from, answer }) => {
+    console.log('📨 Получен answer от:', from);
     await handleCallAnswer(from, answer);
   });
 
@@ -770,15 +764,13 @@ async function searchServers(query) {
 }
 
 async function joinServerById(serverId) {
-  const res = await fetch('/servers/join', {
+  await fetch('/servers/join', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ invite_code: '', user_id: currentUser.id })
   });
-  if (res.ok) {
-    loadServers();
-    document.getElementById('server-search-results').innerHTML = '';
-  }
+  loadServers();
+  document.getElementById('server-search-results').innerHTML = '';
 }
 
 async function joinServerByInvite() {
@@ -891,8 +883,6 @@ async function joinVoiceChannel(channelId) {
       } 
     });
     
-    startAudioVisualization(localStream);
-    
     socket.emit('voice-join', {
       channelId,
       serverId: currentServer,
@@ -905,10 +895,6 @@ async function joinVoiceChannel(channelId) {
       <button id="voice-mute-btn" onclick="toggleVoiceMute()" style="background:var(--bg-hover);color:var(--text-primary);border:2px solid var(--border);padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;margin-left:8px;">🎙️ Мьют</button>
       <button onclick="leaveVoiceChannel()" style="background:var(--red);color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;margin-left:4px;">⏹ Выйти</button>
     `;
-    
-    setTimeout(() => {
-      connectToVoicePeers();
-    }, 1000);
     
   } catch (e) {
     alert('❌ Нет доступа к микрофону! ' + e.message);
@@ -941,23 +927,8 @@ function toggleVoiceMute() {
   }
 }
 
-function connectToVoicePeers() {
-  if (!currentVoiceChannelId) return;
-  
-  socket.emit('voice-join', {
-    channelId: currentVoiceChannelId,
-    serverId: currentServer,
-    userId: currentUser.id,
-    username: currentUser.username
-  });
-}
-
 async function handleVoiceOffer(from, offer) {
   try {
-    if (!localStream && inVoiceChannel) {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-    
     const config = { 
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] 
     };
@@ -1029,7 +1000,7 @@ function updateVoiceUsers(users) {
     html += '<div style="margin-top:4px;">';
     userList.forEach(u => {
       const isMe = u.userId === currentUser.id;
-      html += `<span class="user-badge" id="voice-user-${u.userId}">${isMe ? '⭐ ' : ''}${u.username}</span>`;
+      html += `<span class="user-badge" style="display:inline-block;background:var(--bg-active);padding:2px 8px;border-radius:12px;margin:2px;font-size:10px;">${isMe ? '⭐ ' : ''}${u.username}</span>`;
     });
     html += '</div>';
   }
@@ -1065,19 +1036,26 @@ function leaveVoiceChannel() {
 }
 
 // ============================================================
-//  ДРУЗЬЯ
+//  ДРУЗЬЯ С ОНЛАЙН/ОФЛАЙН СТАТУСОМ
 // ============================================================
 async function searchUsers() {
   const q = document.getElementById('search-user').value.trim();
   if (!q || q.length < 2) { document.getElementById('search-results').innerHTML = ''; return; }
   const res = await fetch(`/users/search?q=${q}`);
   const users = await res.json();
-  document.getElementById('search-results').innerHTML = users.map(u => `
-    <div class="search-result">
-      <span>${u.username}</span>
-      <button class="add-btn" onclick="addFriend(${u.id})">➕</button>
-    </div>
-  `).join('');
+  document.getElementById('search-results').innerHTML = users.map(u => {
+    const isOnline = u.is_online === 1;
+    return `
+      <div class="search-result" style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;">
+        <span>
+          ${u.username}
+          <span class="status-dot ${isOnline ? 'online' : 'offline'}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px;background:${isOnline ? 'var(--green)' : 'var(--text-muted)'};"></span>
+          ${!isOnline ? `<span class="last-seen">${formatLastSeen(u.last_seen)}</span>` : '<span class="last-seen" style="color:var(--green);">в сети</span>'}
+        </span>
+        <button onclick="addFriend(${u.id})" style="padding:2px 12px;border:none;border-radius:6px;background:var(--green);color:#0f0f1a;cursor:pointer;font-weight:700;">➕</button>
+      </div>
+    `;
+  }).join('');
 }
 
 async function addFriend(userId) {
@@ -1094,15 +1072,25 @@ async function loadFriends() {
   const res = await fetch(`/friends/${currentUser.id}`);
   const friends = await res.json();
   const container = document.getElementById('friends-list');
-  container.innerHTML = friends.map(f => `
-    <div class="friend-item">
-      <span>${f.username}</span>
-      <div class="friend-actions">
-        <button class="btn-chat" onclick="openPrivateChat(${f.id}, '${f.username}')">💬</button>
-        <button class="btn-call" onclick="callFriendByName('${f.username}')">📞</button>
+  
+  container.innerHTML = friends.map(f => {
+    const isOnline = f.is_online === 1;
+    return `
+      <div class="friend-item">
+        <span>
+          ${f.username}
+          <span class="friend-status ${isOnline ? 'online' : 'offline'}">
+            ${isOnline ? '🟢 В сети' : '⚫ Не в сети'}
+          </span>
+          ${!isOnline && f.last_seen ? `<span class="last-seen">${formatLastSeen(f.last_seen)}</span>` : ''}
+        </span>
+        <div class="friend-actions">
+          <button class="btn-chat" onclick="openPrivateChat(${f.id}, '${f.username}')">💬</button>
+          ${isOnline ? `<button class="btn-call" onclick="callFriendByName('${f.username}')">📞</button>` : ''}
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   const reqRes = await fetch(`/friends/requests/${currentUser.id}`);
   const requests = await reqRes.json();
@@ -1216,7 +1204,7 @@ function sendMessage() {
 }
 
 // ============================================================
-//  ЛИЧНЫЕ ЗВОНКИ
+//  ЛИЧНЫЕ ЗВОНКИ (ПОЛНОСТЬЮ ИСПРАВЛЕНО)
 // ============================================================
 async function startCall(socketId, username) {
   if (callInProgress) { 
@@ -1228,10 +1216,12 @@ async function startCall(socketId, username) {
     return; 
   }
 
+  console.log('📞 Начинаем звонок:', username);
   currentCallerId = socketId;
   currentCallerUsername = username;
 
   try {
+    // Получаем доступ к микрофону
     localStream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         echoCancellation: true,
@@ -1240,33 +1230,36 @@ async function startCall(socketId, username) {
       }
     });
 
+    // Создаем peer connection
     const config = { 
       iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun.l.google.com:19302' }
       ] 
     };
     const pc = new RTCPeerConnection(config);
     peerConnections[socketId] = pc;
 
+    // Добавляем локальный поток
     localStream.getTracks().forEach(track => {
       pc.addTrack(track, localStream);
     });
 
+    // Обработка входящего аудио
     pc.ontrack = (event) => {
+      console.log('🎵 Получен удаленный аудио поток');
       if (event.streams && event.streams[0]) {
         const remoteAudio = new Audio();
         remoteAudio.srcObject = event.streams[0];
         remoteAudio.autoplay = true;
         remoteAudio.volume = 1.0;
-        remoteAudio.play().catch(e => console.log('Remote audio error:', e));
-        
-        startAudioVisualization(event.streams[0]);
+        remoteAudio.play().catch(e => console.log('Audio play error:', e));
       }
     };
 
+    // Отправка ICE кандидатов
     pc.onicecandidate = (event) => {
       if (event.candidate) {
+        console.log('🧊 Отправка ICE кандидата');
         socket.emit('call-ice', { 
           to: socketId, 
           candidate: event.candidate 
@@ -1274,12 +1267,16 @@ async function startCall(socketId, username) {
       }
     };
 
+    // Создаем offer
+    console.log('📤 Создание offer...');
     const offer = await pc.createOffer({
       offerToReceiveAudio: true,
       offerToReceiveVideo: false
     });
     await pc.setLocalDescription(offer);
+    console.log('✅ Offer создан, отправка...');
     
+    // Отправляем offer и уведомление о звонке
     socket.emit('call-offer', { to: socketId, offer });
     socket.emit('call-user', { 
       to: socketId, 
@@ -1290,64 +1287,86 @@ async function startCall(socketId, username) {
     showCallWindow('outgoing');
     
   } catch (e) {
-    console.error('Call error:', e);
+    console.error('❌ Ошибка звонка:', e);
     alert('❌ Ошибка доступа к микрофону: ' + e.message);
     endCall();
   }
 }
 
 async function handleCallOffer(from, offer) {
+  console.log('📨 Обработка входящего offer от:', from);
+  
   try {
-    if (!callInProgress) return;
-    
+    // Создаем peer connection для ответа
     const config = { 
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' }
       ] 
     };
+    
+    // Закрываем старое соединение если есть
+    if (peerConnections[from]) {
+      peerConnections[from].close();
+    }
+    
     const pc = new RTCPeerConnection(config);
     peerConnections[from] = pc;
     
+    // Добавляем локальный поток если есть
     if (localStream) {
       localStream.getTracks().forEach(track => {
         pc.addTrack(track, localStream);
       });
     }
     
+    // Обработка входящего аудио
     pc.ontrack = (event) => {
+      console.log('🎵 Получен удаленный аудио поток');
       if (event.streams && event.streams[0]) {
         const audio = new Audio();
         audio.srcObject = event.streams[0];
         audio.autoplay = true;
+        audio.volume = 1.0;
         audio.play().catch(e => console.log('Audio error:', e));
       }
     };
     
+    // Отправка ICE кандидатов
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         socket.emit('call-ice', { to: from, candidate: event.candidate });
       }
     };
     
+    // Устанавливаем удаленный offer
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    
+    // Создаем answer
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    
+    // Отправляем answer
     socket.emit('call-answer', { to: from, answer });
     
   } catch(e) {
-    console.error('Handle offer error:', e);
+    console.error('❌ Ошибка обработки offer:', e);
   }
 }
 
 async function handleCallAnswer(from, answer) {
+  console.log('📨 Обработка answer от:', from);
+  
   try {
     if (peerConnections[from]) {
       await peerConnections[from].setRemoteDescription(
         new RTCSessionDescription(answer)
       );
+      console.log('✅ Answer успешно установлен');
+    } else {
+      console.error('❌ Нет peer connection для:', from);
     }
   } catch(e) {
-    console.error('Handle answer error:', e);
+    console.error('❌ Ошибка обработки answer:', e);
   }
 }
 
@@ -1359,18 +1378,23 @@ async function handleCallICE(from, candidate) {
       );
     }
   } catch(e) {
-    console.error('Handle ICE error:', e);
+    console.error('ICE error:', e);
   }
 }
 
 async function acceptCall() {
-  if (!currentCallerId) return;
-  if (callInProgress) return;
+  console.log('📞 Принимаем звонок от:', currentCallerUsername);
+  
+  if (!currentCallerId) {
+    console.error('❌ Нет ID звонящего');
+    return;
+  }
 
   stopRingtone();
   playConnectSound();
 
   try {
+    // Получаем доступ к микрофону если еще нет
     if (!localStream) {
       localStream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -1381,42 +1405,7 @@ async function acceptCall() {
       });
     }
 
-    const config = { 
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' }
-      ] 
-    };
-    const pc = new RTCPeerConnection(config);
-    peerConnections[currentCallerId] = pc;
-
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream);
-    });
-
-    pc.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        const audio = new Audio();
-        audio.srcObject = event.streams[0];
-        audio.autoplay = true;
-        audio.volume = 1.0;
-        audio.play().catch(e => console.log('Audio error:', e));
-        startAudioVisualization(event.streams[0]);
-      }
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit('call-ice', { 
-          to: currentCallerId, 
-          candidate: event.candidate 
-        });
-      }
-    };
-
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-
-    socket.emit('call-answer', { to: currentCallerId, answer });
+    // Отправляем сигнал о принятии звонка
     socket.emit('call-accept', { to: currentCallerId });
 
     callInProgress = true;
@@ -1424,13 +1413,14 @@ async function acceptCall() {
     showCallWindow('active');
     
   } catch (e) {
-    console.error('Accept error:', e);
+    console.error('❌ Ошибка принятия звонка:', e);
     alert('❌ Ошибка: ' + e.message);
     endCall();
   }
 }
 
 function rejectCall() {
+  console.log('❌ Отклоняем звонок');
   stopRingtone();
   playDisconnectSound();
   if (currentCallerId) {
@@ -1440,6 +1430,7 @@ function rejectCall() {
 }
 
 function cancelCall() {
+  console.log('❌ Отменяем звонок');
   if (currentCallerId) {
     socket.emit('call-end', { to: currentCallerId });
   }
@@ -1447,9 +1438,11 @@ function cancelCall() {
 }
 
 function endCall() {
+  console.log('📴 Завершение звонка');
   stopRingtone();
   stopAudioVisualization();
   
+  // Закрываем все соединения
   for (const id in peerConnections) {
     try {
       peerConnections[id].close();
@@ -1457,11 +1450,13 @@ function endCall() {
     delete peerConnections[id];
   }
   
+  // Останавливаем локальный стрим если не в голосовом канале
   if (localStream && !inVoiceChannel) {
     localStream.getTracks().forEach(t => t.stop());
     localStream = null;
   }
   
+  // Останавливаем таймер
   if (callTimerInterval) {
     clearInterval(callTimerInterval);
     callTimerInterval = null;
@@ -1520,7 +1515,6 @@ function showCallWindow(type) {
   const avatarEl = document.getElementById('caller-avatar');
   const buttonsEl = document.getElementById('call-buttons');
   const timerEl = document.getElementById('call-timer');
-  const visualizer = document.getElementById('audio-visualizer');
 
   overlay.classList.add('active');
 
@@ -1532,23 +1526,18 @@ function showCallWindow(type) {
   if (type === 'incoming') {
     statusEl.innerHTML = '<span class="call-status-indicator"><span class="dot ringing"></span> Входящий звонок...</span>';
     timerEl.textContent = '00:00';
-    visualizer.innerHTML = '';
     buttonsEl.innerHTML = `
       <button class="btn-accept ringing" onclick="acceptCall()">📞 Принять</button>
       <button class="btn-reject" onclick="rejectCall()">❌ Отклонить</button>
     `;
   } else if (type === 'outgoing') {
-    statusEl.innerHTML = '<span class="call-status-indicator"><span class="dot ringing"></span> Исходящий звонок...</span>';
+    statusEl.innerHTML = '<span class="call-status-indicator"><span class="dot ringing"></span> Звоним...</span>';
     timerEl.textContent = '00:00';
-    visualizer.innerHTML = '';
     buttonsEl.innerHTML = `
       <button class="btn-cancel" onclick="cancelCall()">❌ Отменить</button>
     `;
   } else if (type === 'active') {
-    statusEl.innerHTML = '<span class="call-status-indicator"><span class="dot connected"></span> В разговоре</span>';
-    if (localStream) {
-      startAudioVisualization(localStream);
-    }
+    statusEl.innerHTML = '<span class="call-status-indicator"><span class="dot connected"></span> Разговор</span>';
     buttonsEl.innerHTML = `
       <button class="btn-mute" onclick="toggleCallMute()">🎙️ Выкл. микрофон</button>
       <button class="btn-end" onclick="endCall()">📴 Завершить</button>
