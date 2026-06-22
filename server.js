@@ -200,7 +200,7 @@ app.get('/messages/:channelId', (req, res) => {
   res.json(stmt.all(req.params.channelId));
 });
 
-// ========== ДРУЗЬЯ (МГНОВЕННО) ==========
+// ========== ДРУЗЬЯ ==========
 app.get('/users/search', (req, res) => {
   const { q } = req.query;
   const stmt = db.prepare('SELECT id, username FROM users WHERE username LIKE ? LIMIT 10');
@@ -245,7 +245,7 @@ app.get('/friends/requests/:userId', (req, res) => {
   res.json(stmt.all(req.params.userId));
 });
 
-// ========== ЛИЧНЫЕ СООБЩЕНИЯ (ЛС) ==========
+// ========== ЛИЧНЫЕ СООБЩЕНИЯ ==========
 app.post('/private/message', (req, res) => {
   const { from_user, to_user, content } = req.body;
   try {
@@ -290,7 +290,6 @@ io.on('connection', (socket) => {
     socket.join(`channel-${channelId}`);
   });
 
-  // ===== ОБЩИЕ СООБЩЕНИЯ =====
   socket.on('message', (data) => {
     const { channelId, userId, content } = data;
     try {
@@ -310,7 +309,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ===== ЛИЧНЫЕ СООБЩЕНИЯ (МГНОВЕННО) =====
   socket.on('private-message', (data) => {
     const { from_user, to_user, content, to_socket_id } = data;
     try {
@@ -320,18 +318,16 @@ io.on('connection', (socket) => {
       const msgStmt = db.prepare(`SELECT * FROM private_messages WHERE id = ?`);
       const msg = msgStmt.get(info.lastInsertRowid);
       
-      // Отправляем собеседнику
       if (to_socket_id) {
         io.to(to_socket_id).emit('private-message', { ...msg, from_user, to_user });
       }
-      // Отправляем отправителю
       socket.emit('private-message-sent', msg);
     } catch (error) {
-      console.error('Ошибка ЛС:', error);
+      console.error('Ошибка личного сообщения:', error);
     }
   });
 
-  // ===== ГОЛОСОВЫЕ КАНАЛЫ =====
+  // ===== ГОЛОСОВЫЕ КАНАЛЫ (ПОЛНОСТЬЮ ПЕРЕПИСАНЫ) =====
   socket.on('voice-join', ({ channelId, serverId, userId, username }) => {
     const roomName = `voice-${channelId}`;
     socket.join(roomName);
@@ -340,12 +336,14 @@ io.on('connection', (socket) => {
       voiceRooms[roomName] = [];
     }
     
+    // Удаляем если уже есть
     voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
     voiceRooms[roomName].push({ userId, username, socketId: socket.id });
     
+    // Отправляем всем в комнате обновлённый список
     io.to(roomName).emit('voice-users', voiceRooms[roomName]);
     
-    console.log(`🎤 ${username} вошёл в голосовой канал`);
+    console.log(`🎤 ${username} вошёл в голосовой канал ${channelId}`);
   });
 
   socket.on('voice-leave', ({ channelId, userId }) => {
@@ -362,10 +360,22 @@ io.on('connection', (socket) => {
     }
   });
 
-  // WebRTC сигналинг для голоса
-  socket.on('voice-signal', ({ to, signal }) => {
+  // WebRTC сигналинг для голосовых каналов
+  socket.on('voice-offer', ({ to, offer }) => {
     if (onlineUsers[to]) {
-      io.to(to).emit('voice-signal', { from: socket.id, signal });
+      io.to(to).emit('voice-offer', { from: socket.id, offer });
+    }
+  });
+
+  socket.on('voice-answer', ({ to, answer }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('voice-answer', { from: socket.id, answer });
+    }
+  });
+
+  socket.on('voice-ice', ({ to, candidate }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('voice-ice', { from: socket.id, candidate });
     }
   });
 
@@ -399,9 +409,21 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('call-signal', ({ to, signal }) => {
+  socket.on('call-offer', ({ to, offer }) => {
     if (onlineUsers[to]) {
-      io.to(to).emit('call-signal', { from: socket.id, signal });
+      io.to(to).emit('call-offer', { from: socket.id, offer });
+    }
+  });
+
+  socket.on('call-answer', ({ to, answer }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-answer', { from: socket.id, answer });
+    }
+  });
+
+  socket.on('call-ice', ({ to, candidate }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-ice', { from: socket.id, candidate });
     }
   });
 
@@ -410,6 +432,7 @@ io.on('connection', (socket) => {
     if (user) {
       console.log(`❌ ${user.username} вышел`);
       
+      // Удаляем из голосовых комнат
       for (const roomName in voiceRooms) {
         voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== user.userId);
         io.to(roomName).emit('voice-users', voiceRooms[roomName]);
