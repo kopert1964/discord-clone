@@ -6,9 +6,9 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
     body { display: flex; height: 100vh; background: #1e1e2e; color: #cdd6f4; }
-    #login, #register { display: flex; flex-direction: column; gap: 10px; margin: auto; padding: 40px; background: #313244; border-radius: 12px; }
+    #login, #register { display: flex; flex-direction: column; gap: 10px; margin: auto; padding: 40px; background: #313244; border-radius: 12px; min-width: 300px; }
     #login input, #register input { padding: 10px; border: none; border-radius: 6px; background: #45475a; color: #cdd6f4; }
-    #login button, #register button { padding: 10px; background: #89b4fa; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    #login button, #register button { padding: 10px; background: #89b4fa; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: #1e1e2e; }
     #app { display: none; width: 100%; }
     .sidebar { width: 240px; background: #1e1e2e; padding: 15px; border-right: 1px solid #313244; overflow-y: auto; }
     .sidebar h3 { color: #a6adc8; font-size: 14px; margin: 15px 0 5px; }
@@ -23,20 +23,17 @@
     .message .time { font-size: 10px; color: #6c7086; margin-left: 10px; }
     .input-area { display: flex; padding: 15px; gap: 10px; border-top: 1px solid #313244; }
     .input-area input { flex: 1; padding: 10px; border-radius: 8px; border: none; background: #313244; color: #cdd6f4; }
-    .input-area button { padding: 10px 20px; background: #89b4fa; border: none; border-radius: 8px; cursor: pointer; }
-    .server-list { display: flex; flex-direction: column; gap: 5px; }
+    .input-area button { padding: 10px 20px; background: #89b4fa; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #1e1e2e; }
     .voice { margin-top: 15px; padding: 10px; background: #313244; border-radius: 8px; }
-    .voice button { background: #a6e3a1; border: none; padding: 8px; border-radius: 6px; cursor: pointer; }
+    .voice button { background: #a6e3a1; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: bold; }
     #users-list { margin-top: 10px; }
     .online-user { padding: 4px 8px; font-size: 13px; color: #a6adc8; }
     .online-user::before { content: "🟢 "; }
-    .flex { display: flex; gap: 10px; align-items: center; }
     .hidden { display: none; }
   </style>
 </head>
 <body>
 
-<!-- LOGIN / REGISTER -->
 <div id="auth">
   <div id="login">
     <h2>Вход</h2>
@@ -54,17 +51,11 @@
   </div>
 </div>
 
-<!-- APP -->
 <div id="app">
-  <div class="sidebar" id="sidebar">
+  <div class="sidebar">
     <h3>Сервера</h3>
     <div id="servers-list"></div>
-    <button onclick="createServer()" style="margin-top:10px; background:#89b4fa; border:none; padding:6px; border-radius:6px; cursor:pointer;">+ Создать сервер</button>
-    <h3 style="margin-top:20px;">Друзья</h3>
-    <div id="friends-list">
-      <input id="search-user" placeholder="Поиск..." oninput="searchUsers()" style="width:100%; padding:6px; border-radius:6px; border:none; background:#45475a; color:#cdd6f4;" />
-      <div id="search-results"></div>
-    </div>
+    <button onclick="createServer()" style="margin-top:10px; background:#89b4fa; border:none; padding:6px; border-radius:6px; cursor:pointer; font-weight:bold;">+ Создать сервер</button>
     <h3 style="margin-top:20px;">Онлайн</h3>
     <div id="users-list"></div>
     <div class="voice">
@@ -84,15 +75,10 @@
 </div>
 
 <script>
-  let socket;
-  let currentUser = null;
-  let currentChannel = null;
-  let currentServer = null;
-  let token = null;
+  let socket, currentUser, currentChannel, currentServer, token;
   let localStream = null;
   let peerConnections = {};
 
-  // ======= AUTH =======
   function showRegister() {
     document.getElementById('login').classList.add('hidden');
     document.getElementById('register').classList.remove('hidden');
@@ -110,12 +96,8 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
-    if (res.ok) {
-      alert('Зарегистрирован! Теперь войдите.');
-      showLogin();
-    } else {
-      alert('Ошибка регистрации');
-    }
+    if (res.ok) { alert('Зарегистрирован! Войдите.'); showLogin(); }
+    else alert('Ошибка регистрации');
   }
 
   async function login() {
@@ -134,28 +116,16 @@
       document.getElementById('app').style.display = 'flex';
       initSocket();
       loadServers();
-    } else {
-      alert('Неверный логин или пароль');
-    }
+    } else alert('Неверный логин или пароль');
   }
 
-  // ======= SOCKET =======
   function initSocket() {
     socket = io();
-    socket.on('connect', () => {
-      socket.emit('join', { userId: currentUser.id, username: currentUser.username });
-    });
-
+    socket.on('connect', () => socket.emit('join', { userId: currentUser.id, username: currentUser.username }));
     socket.on('users', (users) => {
-      const list = document.getElementById('users-list');
-      list.innerHTML = users.map(u => `<div class="online-user">${u.username}</div>`).join('');
+      document.getElementById('users-list').innerHTML = users.map(u => `<div class="online-user">${u.username}</div>`).join('');
     });
-
-    socket.on('message', (msg) => {
-      addMessage(msg);
-    });
-
-    // WebRTC сигналинг
+    socket.on('message', addMessage);
     socket.on('signal', async (data) => {
       if (peerConnections[data.from]) {
         await peerConnections[data.from].setRemoteDescription(new RTCSessionDescription(data.signal));
@@ -168,14 +138,12 @@
     });
   }
 
-  // ======= SERVERS =======
   async function loadServers() {
     const res = await fetch(`/servers/${currentUser.id}`);
     const servers = await res.json();
-    const list = document.getElementById('servers-list');
-    list.innerHTML = servers.map(s => `
-      <div class="item" onclick="selectServer(${s.id})"># ${s.name}</div>
-    `).join('');
+    document.getElementById('servers-list').innerHTML = servers.map(s => 
+      `<div class="item" onclick="selectServer(${s.id})"># ${s.name}</div>`
+    ).join('');
     if (servers.length) selectServer(servers[0].id);
   }
 
@@ -195,19 +163,15 @@
     socket.emit('join-server', serverId);
     const res = await fetch(`/channels/${serverId}`);
     const channels = await res.json();
-    const list = document.getElementById('servers-list');
-    // обновим активный сервер
-    document.querySelectorAll('#servers-list .item').forEach(el => el.classList.remove('active'));
-    // добавим каналы в сайдбар
+    const container = document.getElementById('servers-list');
     const channelDiv = document.createElement('div');
     channelDiv.id = 'channels-list';
-    channelDiv.innerHTML = channels.map(c => `
-      <div class="item" onclick="selectChannel(${c.id})"># ${c.name}</div>
-    `).join('');
-    // удалим старые каналы
+    channelDiv.innerHTML = channels.map(c => 
+      `<div class="item" onclick="selectChannel(${c.id})"># ${c.name}</div>`
+    ).join('');
     const old = document.getElementById('channels-list');
     if (old) old.remove();
-    list.after(channelDiv);
+    container.after(channelDiv);
     if (channels.length) selectChannel(channels[0].id);
   }
 
@@ -217,8 +181,7 @@
     document.getElementById('chat-header').textContent = `# канал ${channelId}`;
     const res = await fetch(`/messages/${channelId}`);
     const messages = await res.json();
-    const container = document.getElementById('messages');
-    container.innerHTML = '';
+    document.getElementById('messages').innerHTML = '';
     messages.forEach(addMessage);
   }
 
@@ -226,11 +189,7 @@
     const container = document.getElementById('messages');
     const div = document.createElement('div');
     div.className = 'message';
-    div.innerHTML = `
-      <span class="user">${msg.username}</span>
-      <span class="time">${new Date(msg.timestamp).toLocaleTimeString()}</span>
-      <div>${msg.content}</div>
-    `;
+    div.innerHTML = `<span class="user">${msg.username}</span><span class="time">${new Date(msg.timestamp).toLocaleTimeString()}</span><div>${msg.content}</div>`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }
@@ -239,78 +198,43 @@
     const input = document.getElementById('message-input');
     const content = input.value.trim();
     if (!content || !currentChannel) return;
-    socket.emit('message', {
-      channelId: currentChannel,
-      userId: currentUser.id,
-      content
-    });
+    socket.emit('message', { channelId: currentChannel, userId: currentUser.id, content });
     input.value = '';
   }
 
-  // ======= ПОИСК ДРУЗЕЙ =======
-  async function searchUsers() {
-    const q = document.getElementById('search-user').value;
-    if (!q) return;
-    const res = await fetch(`/users/search?q=${q}`);
-    const users = await res.json();
-    const container = document.getElementById('search-results');
-    container.innerHTML = users.map(u => `
-      <div class="online-user">${u.username} 
-        <button onclick="addFriend(${u.id})" style="background:#a6e3a1;border:none;border-radius:4px;padding:2px 8px;">+</button>
-      </div>
-    `).join('');
-  }
-
-  function addFriend(userId) {
-    alert('Функция добавления в друзья (можно реализовать через БД)');
-  }
-
-  // ======= VOICE (WebRTC) =======
   async function startVoice() {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Создаем peer-соединения со всеми онлайн-пользователями
       const users = document.querySelectorAll('#users-list .online-user');
       users.forEach(user => {
-        const userId = user.textContent.trim();
-        if (userId !== currentUser.username) {
+        const username = user.textContent.trim();
+        if (username !== currentUser.username) {
           const pc = new RTCPeerConnection();
-          peerConnections[userId] = pc;
+          peerConnections[username] = pc;
           localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
           pc.onicecandidate = (e) => {
-            if (e.candidate) {
-              socket.emit('signal', { to: userId, signal: { candidate: e.candidate } });
-            }
+            if (e.candidate) socket.emit('signal', { to: username, signal: { candidate: e.candidate } });
           };
           pc.ontrack = (e) => {
             const audio = new Audio();
             audio.srcObject = e.streams[0];
             audio.play();
           };
-          // Создаем offer
           pc.createOffer().then(offer => pc.setLocalDescription(offer))
-            .then(() => {
-              socket.emit('signal', { to: userId, signal: pc.localDescription });
-            });
+            .then(() => socket.emit('signal', { to: username, signal: pc.localDescription }));
         }
       });
       alert('Голосовой чат запущен!');
-    } catch (e) {
-      alert('Ошибка доступа к микрофону');
-    }
+    } catch (e) { alert('Ошибка доступа к микрофону'); }
   }
 
   function stopVoice() {
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-    }
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
     Object.values(peerConnections).forEach(pc => pc.close());
     peerConnections = {};
     alert('Голосовой чат остановлен');
   }
 
-  // ======= ENTER =======
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.activeElement.id === 'message-input') sendMessage();
   });
