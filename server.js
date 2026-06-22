@@ -1,456 +1,332 @@
-const express = require('express');
-const http = require('http');
-const socketIO = require('socket.io');
-const Database = require('better-sqlite3');
-const path = require('path');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const cors = require('cors');
+// ... весь предыдущий код HTML до скрипта ...
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIO(server, {
-  cors: { origin: "*" },
-  transports: ['websocket', 'polling']
-});
+<script>
+// ========== ЭМОДЗИ ПАНЕЛЬ ==========
+const EMOJI_LIST = ['😀','😂','😍','😎','🤔','😢','😡','👍','👎','🎉','🔥','❤️','💔','⭐','✨','💬','📞','🎤','🔊','🔇','✅','❌','➡️','⬅️','🙏','💪','🤝','👋','💻','📱','🎵','🎶','🎼','🎧','🎮','🎯','🎨','🎭'];
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-const db = new Database('/tmp/discord.db');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS servers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    owner_id INTEGER,
-    invite_code TEXT UNIQUE
-  );
-
-  CREATE TABLE IF NOT EXISTS channels (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    server_id INTEGER,
-    is_public INTEGER DEFAULT 1,
-    is_voice INTEGER DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    channel_id INTEGER,
-    user_id INTEGER,
-    content TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS members (
-    user_id INTEGER,
-    server_id INTEGER,
-    PRIMARY KEY (user_id, server_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS friends (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    friend_id INTEGER,
-    status TEXT DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, friend_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS private_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    from_user INTEGER,
-    to_user INTEGER,
-    content TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    read INTEGER DEFAULT 0
-  );
-`);
-
-console.log('✅ База данных готова');
-
-const SECRET = 'supersecretkey';
-
-// ========== АУТЕНТИФИКАЦИЯ ==========
-app.post('/register', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const hash = await bcrypt.hash(password, 10);
-    const stmt = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
-    const info = stmt.run(username, hash);
-    res.json({ id: info.lastInsertRowid, username });
-  } catch (error) {
-    res.status(400).json({ error: 'Пользователь уже существует' });
+function toggleEmojiPicker() {
+  const picker = document.getElementById('emoji-picker');
+  if (picker.classList.contains('show')) {
+    picker.classList.remove('show');
+    return;
   }
-});
+  picker.innerHTML = EMOJI_LIST.map(e => `<span onclick="insertEmoji('${e}')">${e}</span>`).join('');
+  picker.classList.add('show');
+}
 
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
-  const user = stmt.get(username);
-  
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(401).json({ error: 'Неверный логин или пароль' });
+function insertEmoji(emoji) {
+  const input = document.getElementById('message-input');
+  input.value += emoji;
+  input.focus();
+  document.getElementById('emoji-picker').classList.remove('show');
+}
+
+// ========== ИНДИКАТОР ПЕЧАТАЕТ ==========
+let typingTimeout = null;
+
+function handleTyping() {
+  const input = document.getElementById('message-input');
+  if (input.value.trim() === '') {
+    stopTyping();
+    return;
   }
   
-  const token = jwt.sign({ id: user.id, username: user.username }, SECRET);
-  res.json({ token, user: { id: user.id, username: user.username } });
-});
+  if (typingTimeout) clearTimeout(typingTimeout);
+  
+  if (isPrivateChat && privateChatFriendId) {
+    let targetSocketId = null;
+    document.querySelectorAll('#users-list .online-user').forEach(el => {
+      if (parseInt(el.dataset.userid) === privateChatFriendId) targetSocketId = el.dataset.socketid;
+    });
+    socket.emit('private-typing-start', { to_socket_id: targetSocketId, username: currentUser.username });
+  } else if (currentChannel) {
+    socket.emit('typing-start', { channelId: currentChannel, username: currentUser.username });
+  }
+  
+  typingTimeout = setTimeout(stopTyping, 3000);
+}
 
-// ========== СЕРВЕРА ==========
-app.post('/servers', (req, res) => {
-  const { name, owner_id } = req.body;
+function stopTyping() {
+  if (typingTimeout) clearTimeout(typingTimeout);
+  
+  if (isPrivateChat && privateChatFriendId) {
+    let targetSocketId = null;
+    document.querySelectorAll('#users-list .online-user').forEach(el => {
+      if (parseInt(el.dataset.userid) === privateChatFriendId) targetSocketId = el.dataset.socketid;
+    });
+    socket.emit('private-typing-stop', { to_socket_id: targetSocketId });
+  } else if (currentChannel) {
+    socket.emit('typing-stop', { channelId: currentChannel });
+  }
+  
+  hideTyping();
+}
+
+function showTyping(username) {
+  const indicator = document.getElementById('typing-indicator');
+  document.getElementById('typing-username').textContent = username || 'Кто-то';
+  indicator.classList.add('active');
+}
+
+function hideTyping() {
+  document.getElementById('typing-indicator').classList.remove('active');
+}
+
+// ========== ИНДИКАТОР ГОЛОСА ==========
+function updateVoiceIndicator(element, stream) {
+  if (!stream) return;
+  
   try {
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const stmt = db.prepare('INSERT INTO servers (name, owner_id, invite_code) VALUES (?, ?, ?)');
-    const info = stmt.run(name, owner_id, inviteCode);
-    const serverId = info.lastInsertRowid;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    const source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
     
-    db.prepare('INSERT INTO members (user_id, server_id) VALUES (?, ?)').run(owner_id, serverId);
-    db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
-      .run('general', serverId, 1, 0);
-    db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
-      .run('Голосовой канал', serverId, 1, 1);
-    
-    res.json({ id: serverId, name, invite_code: inviteCode });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.get('/servers/:userId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT s.* FROM servers s
-    JOIN members m ON m.server_id = s.id
-    WHERE m.user_id = ?
-  `);
-  res.json(stmt.all(req.params.userId));
-});
-
-app.get('/servers/search/:query', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT s.* FROM servers s
-    WHERE s.name LIKE ? AND s.is_public = 1
-    LIMIT 20
-  `);
-  res.json(stmt.all(`%${req.params.query}%`));
-});
-
-app.post('/servers/join', (req, res) => {
-  const { invite_code, user_id } = req.body;
-  try {
-    const stmt = db.prepare('SELECT id FROM servers WHERE invite_code = ?');
-    const server = stmt.get(invite_code);
-    if (!server) {
-      return res.status(404).json({ error: 'Сервер не найден' });
-    }
-    
-    db.prepare('INSERT OR IGNORE INTO members (user_id, server_id) VALUES (?, ?)')
-      .run(user_id, server.id);
-    res.json({ success: true, server_id: server.id });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.get('/servers/invite/:serverId', (req, res) => {
-  const stmt = db.prepare('SELECT invite_code FROM servers WHERE id = ?');
-  const server = stmt.get(req.params.serverId);
-  if (server) {
-    res.json({ invite_code: server.invite_code });
-  } else {
-    res.status(404).json({ error: 'Сервер не найден' });
-  }
-});
-
-// ========== КАНАЛЫ ==========
-app.get('/channels/:serverId', (req, res) => {
-  const stmt = db.prepare('SELECT * FROM channels WHERE server_id = ?');
-  res.json(stmt.all(req.params.serverId));
-});
-
-app.post('/channels', (req, res) => {
-  const { name, server_id, is_public, is_voice } = req.body;
-  try {
-    const stmt = db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)');
-    const info = stmt.run(name, server_id, is_public || 1, is_voice || 0);
-    res.json({ id: info.lastInsertRowid, name, server_id, is_public: is_public || 1, is_voice: is_voice || 0 });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// ========== СООБЩЕНИЯ ==========
-app.get('/messages/:channelId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT m.*, u.username 
-    FROM messages m
-    JOIN users u ON u.id = m.user_id
-    WHERE m.channel_id = ?
-    ORDER BY m.timestamp ASC LIMIT 100
-  `);
-  res.json(stmt.all(req.params.channelId));
-});
-
-// ========== ДРУЗЬЯ ==========
-app.get('/users/search', (req, res) => {
-  const { q } = req.query;
-  const stmt = db.prepare('SELECT id, username FROM users WHERE username LIKE ? LIMIT 10');
-  res.json(stmt.all(`%${q}%`));
-});
-
-app.post('/friends/request', (req, res) => {
-  const { userId, friendId } = req.body;
-  try {
-    const stmt = db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)');
-    stmt.run(userId, friendId, 'pending');
-    res.json({ success: true });
-  } catch (error) {
-    res.status(400).json({ error: 'Заявка уже отправлена' });
-  }
-});
-
-app.post('/friends/accept', (req, res) => {
-  const { userId, friendId } = req.body;
-  const stmt = db.prepare('UPDATE friends SET status = "accepted" WHERE user_id = ? AND friend_id = ?');
-  stmt.run(friendId, userId);
-  res.json({ success: true });
-});
-
-app.get('/friends/:userId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT u.id, u.username, f.status 
-    FROM friends f
-    JOIN users u ON (u.id = f.friend_id OR u.id = f.user_id)
-    WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted' AND u.id != ?
-  `);
-  res.json(stmt.all(req.params.userId, req.params.userId, req.params.userId));
-});
-
-app.get('/friends/requests/:userId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT u.id, u.username 
-    FROM friends f
-    JOIN users u ON u.id = f.user_id
-    WHERE f.friend_id = ? AND f.status = 'pending'
-  `);
-  res.json(stmt.all(req.params.userId));
-});
-
-// ========== ЛИЧНЫЕ СООБЩЕНИЯ ==========
-app.post('/private/message', (req, res) => {
-  const { from_user, to_user, content } = req.body;
-  try {
-    const stmt = db.prepare('INSERT INTO private_messages (from_user, to_user, content) VALUES (?, ?, ?)');
-    const info = stmt.run(from_user, to_user, content);
-    res.json({ id: info.lastInsertRowid });
-  } catch (error) {
-    res.status(400).json({ error: 'Ошибка отправки' });
-  }
-});
-
-app.get('/private/messages/:userId/:friendId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT * FROM private_messages 
-    WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
-    ORDER BY timestamp ASC LIMIT 100
-  `);
-  res.json(stmt.all(
-    req.params.userId, req.params.friendId,
-    req.params.friendId, req.params.userId
-  ));
-});
-
-// ========== SOCKET.IO ==========
-const onlineUsers = {};
-const voiceRooms = {};
-
-io.on('connection', (socket) => {
-  console.log('👤 Подключился:', socket.id);
-
-  socket.on('join', ({ userId, username }) => {
-    onlineUsers[socket.id] = { userId, username, socketId: socket.id };
-    io.emit('users', Object.values(onlineUsers));
-    console.log(`✅ ${username} онлайн`);
-  });
-
-  socket.on('join-server', (serverId) => {
-    socket.join(`server-${serverId}`);
-  });
-
-  socket.on('join-channel', (channelId) => {
-    socket.join(`channel-${channelId}`);
-  });
-
-  socket.on('message', (data) => {
-    const { channelId, userId, content } = data;
-    try {
-      const stmt = db.prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)');
-      const info = stmt.run(channelId, userId, content);
+    const checkSpeaking = () => {
+      analyser.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
       
-      const msgStmt = db.prepare(`
-        SELECT m.*, u.username 
-        FROM messages m
-        JOIN users u ON u.id = m.user_id
-        WHERE m.id = ?
-      `);
-      const msg = msgStmt.get(info.lastInsertRowid);
-      io.to(`channel-${channelId}`).emit('message', msg);
-    } catch (error) {
-      console.error('Ошибка:', error);
-    }
-  });
-
-  socket.on('private-message', (data) => {
-    const { from_user, to_user, content, to_socket_id } = data;
-    try {
-      const stmt = db.prepare('INSERT INTO private_messages (from_user, to_user, content) VALUES (?, ?, ?)');
-      const info = stmt.run(from_user, to_user, content);
-      
-      const msgStmt = db.prepare(`SELECT * FROM private_messages WHERE id = ?`);
-      const msg = msgStmt.get(info.lastInsertRowid);
-      
-      if (to_socket_id) {
-        io.to(to_socket_id).emit('private-message', { ...msg, from_user, to_user });
+      if (average > 20) {
+        element.classList.add('speaking');
+        element.classList.remove('silent');
+      } else {
+        element.classList.add('silent');
+        element.classList.remove('speaking');
       }
-      socket.emit('private-message-sent', msg);
-    } catch (error) {
-      console.error('Ошибка личного сообщения:', error);
-    }
-  });
-
-  // ===== ГОЛОСОВЫЕ КАНАЛЫ (ПОЛНОСТЬЮ ПЕРЕПИСАНЫ) =====
-  socket.on('voice-join', ({ channelId, serverId, userId, username }) => {
-    const roomName = `voice-${channelId}`;
-    socket.join(roomName);
-    
-    if (!voiceRooms[roomName]) {
-      voiceRooms[roomName] = [];
-    }
-    
-    // Удаляем если уже есть
-    voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
-    voiceRooms[roomName].push({ userId, username, socketId: socket.id });
-    
-    // Отправляем всем в комнате обновлённый список
-    io.to(roomName).emit('voice-users', voiceRooms[roomName]);
-    
-    console.log(`🎤 ${username} вошёл в голосовой канал ${channelId}`);
-  });
-
-  socket.on('voice-leave', ({ channelId, userId }) => {
-    const roomName = `voice-${channelId}`;
-    socket.leave(roomName);
-    
-    if (voiceRooms[roomName]) {
-      voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
-      io.to(roomName).emit('voice-users', voiceRooms[roomName]);
       
-      if (voiceRooms[roomName].length === 0) {
-        delete voiceRooms[roomName];
+      if (callInProgress || inVoiceChannel) {
+        requestAnimationFrame(checkSpeaking);
       }
-    }
-  });
+    };
+    
+    checkSpeaking();
+  } catch (e) {
+    console.error('Voice indicator error:', e);
+  }
+}
 
-  // WebRTC сигналинг для голосовых каналов
-  socket.on('voice-offer', ({ to, offer }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('voice-offer', { from: socket.id, offer });
-    }
-  });
+// ========== РЕГУЛЯТОР ГРОМКОСТИ ==========
+function setRemoteVolume(value) {
+  if (remoteAudioElement) {
+    remoteAudioElement.volume = value / 100;
+  }
+}
 
-  socket.on('voice-answer', ({ to, answer }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('voice-answer', { from: socket.id, answer });
-    }
-  });
+// ========== ЗВОНКИ (ДОРАБОТАННЫЕ) ==========
+async function startCall(socketId, username) {
+  if (callInProgress) {
+    alert('У вас уже активный звонок!');
+    return;
+  }
+  if (socketId === socket.id) {
+    alert('Нельзя позвонить самому себе!');
+    return;
+  }
 
-  socket.on('voice-ice', ({ to, candidate }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('voice-ice', { from: socket.id, candidate });
-    }
-  });
+  currentCallerId = socketId;
+  currentCallerUsername = username;
 
-  // ===== ЛИЧНЫЕ ЗВОНКИ =====
-  socket.on('call-user', ({ to, fromUsername }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('incoming-call', {
-        from: socket.id,
-        fromUsername: fromUsername || 'Неизвестный'
-      });
-    } else {
-      socket.emit('call-failed', { reason: 'Пользователь не в сети' });
-    }
-  });
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
 
-  socket.on('call-accept', ({ to }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('call-connected', { from: socket.id });
-    }
-  });
+    callInProgress = true;
+    socket.emit('call-user', { to: socketId, fromUsername: currentUser.username });
+    showCallWindow('outgoing');
+  } catch (e) {
+    console.error('Call error:', e);
+    alert('❌ Ошибка доступа к микрофону: ' + e.message);
+    endCall();
+  }
+}
 
-  socket.on('call-reject', ({ to }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('call-failed', { reason: 'Пользователь отклонил звонок' });
-    }
-  });
-
-  socket.on('call-end', ({ to }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('call-ended');
-    }
-  });
-
-  socket.on('call-offer', ({ to, offer }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('call-offer', { from: socket.id, offer });
-    }
-  });
-
-  socket.on('call-answer', ({ to, answer }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('call-answer', { from: socket.id, answer });
-    }
-  });
-
-  socket.on('call-ice', ({ to, candidate }) => {
-    if (onlineUsers[to]) {
-      io.to(to).emit('call-ice', { from: socket.id, candidate });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    const user = onlineUsers[socket.id];
-    if (user) {
-      console.log(`❌ ${user.username} вышел`);
+async function createOffer() {
+  if (peerConnection) peerConnection.close();
+  
+  const config = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+  
+  peerConnection = new RTCPeerConnection(config);
+  
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
+    });
+  }
+  
+  peerConnection.ontrack = (event) => {
+    if (event.streams && event.streams[0]) {
+      if (remoteAudioElement) {
+        remoteAudioElement.srcObject = null;
+        remoteAudioElement.remove();
+      }
       
-      // Удаляем из голосовых комнат
-      for (const roomName in voiceRooms) {
-        voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== user.userId);
-        io.to(roomName).emit('voice-users', voiceRooms[roomName]);
-        if (voiceRooms[roomName].length === 0) {
-          delete voiceRooms[roomName];
+      remoteAudioElement = new Audio();
+      remoteAudioElement.srcObject = event.streams[0];
+      remoteAudioElement.autoplay = true;
+      remoteAudioElement.volume = document.getElementById('remote-volume').value / 100;
+      remoteAudioElement.play().catch(e => console.error('Audio play error:', e));
+      
+      // Обновляем индикатор голоса для входящего аудио
+      const voiceIndicator = document.getElementById('call-voice-indicator');
+      updateVoiceIndicator(voiceIndicator, event.streams[0]);
+      
+      startAudioVisualization(event.streams[0]);
+    }
+  };
+  
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit('call-ice', { to: currentCallerId, candidate: event.candidate });
+    }
+  };
+  
+  peerConnection.onconnectionstatechange = () => {
+    console.log('📡 Состояние соединения:', peerConnection.connectionState);
+    if (peerConnection.connectionState === 'connected') {
+      console.log('✅ WebRTC соединение установлено!');
+    }
+  };
+  
+  const offer = await peerConnection.createOffer({
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: false
+  });
+  
+  await peerConnection.setLocalDescription(offer);
+  socket.emit('call-offer', { to: currentCallerId, offer });
+  
+  callInProgress = true;
+  startTimer();
+  showCallWindow('active');
+}
+
+async function handleOffer(from, offer) {
+  if (peerConnection) peerConnection.close();
+  
+  const config = {
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  };
+  
+  peerConnection = new RTCPeerConnection(config);
+  
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
+    });
+  }
+  
+  peerConnection.ontrack = (event) => {
+    if (event.streams && event.streams[0]) {
+      if (remoteAudioElement) {
+        remoteAudioElement.srcObject = null;
+        remoteAudioElement.remove();
+      }
+      
+      remoteAudioElement = new Audio();
+      remoteAudioElement.srcObject = event.streams[0];
+      remoteAudioElement.autoplay = true;
+      remoteAudioElement.volume = document.getElementById('remote-volume').value / 100;
+      remoteAudioElement.play().catch(e => console.error('Audio error:', e));
+      
+      const voiceIndicator = document.getElementById('call-voice-indicator');
+      updateVoiceIndicator(voiceIndicator, event.streams[0]);
+    }
+  };
+  
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit('call-ice', { to: from, candidate: event.candidate });
+    }
+  };
+  
+  await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+  socket.emit('call-answer', { to: from, answer });
+  
+  callInProgress = true;
+  startTimer();
+  showCallWindow('active');
+}
+
+async function acceptCall() {
+  if (!currentCallerId) return;
+  
+  stopRingtone();
+  playConnectSound();
+  
+  try {
+    if (!localStream) {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
-      }
+      });
     }
-    delete onlineUsers[socket.id];
-    io.emit('users', Object.values(onlineUsers));
-  });
+    
+    socket.emit('call-accept', { to: currentCallerId });
+    createOffer();
+  } catch (e) {
+    console.error('Accept error:', e);
+    alert('❌ Ошибка: ' + e.message);
+    endCall();
+  }
+}
+
+// ... остальные функции звонков остаются похожими ...
+
+// В обработчиках socket.on добавить:
+socket.on('user-typing', ({ username }) => {
+  showTyping(username);
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+socket.on('user-stop-typing', () => {
+  hideTyping();
 });
 
-const port = process.env.PORT || 3000;
-server.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 Сервер запущен на порту ${port}`);
+socket.on('private-user-typing', ({ username }) => {
+  showTyping(username);
 });
+
+socket.on('private-user-stop-typing', () => {
+  hideTyping();
+});
+
+// ========== ЗАПУСК ==========
+loadSavedLogin();
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.activeElement.id === 'message-input') {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Закрываем эмодзи панель при клике вне её
+document.addEventListener('click', (e) => {
+  const picker = document.getElementById('emoji-picker');
+  const emojiBtn = document.querySelector('.emoji-btn');
+  if (picker && emojiBtn && !picker.contains(e.target) && !emojiBtn.contains(e.target)) {
+    picker.classList.remove('show');
+  }
+});
+
+window.addEventListener('beforeunload', () => {
+  if (inVoiceChannel) leaveVoiceChannel();
+  if (callInProgress) endCall();
+});
+</script>

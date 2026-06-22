@@ -1,216 +1,404 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>💬 Discord Clone</title>
+  <title>💬 Discord Clone - Полный фарш</title>
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', system-ui, sans-serif; }
     
     :root {
-      --bg-primary: #0f0f1a;
-      --bg-secondary: #1a1a2e;
-      --bg-sidebar: #141424;
-      --bg-hover: #2a2a4a;
-      --bg-active: #3a3a6a;
-      --text-primary: #e8e8f0;
-      --text-secondary: #a0a0c0;
-      --text-muted: #6a6a8a;
-      --accent: #6c5ce7;
-      --green: #00d4a0;
-      --red: #ff6b6b;
-      --border: #2a2a4a;
+      --bg-primary:#0f0f1a;
+      --bg-secondary:#1a1a2e;
+      --bg-sidebar:#141424;
+      --bg-hover:#2a2a4a;
+      --bg-active:#3a3a6a;
+      --text-primary:#e8e8f0;
+      --text-secondary:#a0a0c0;
+      --text-muted:#6a6a8a;
+      --accent:#6c5ce7;
+      --green:#00d4a0;
+      --red:#ff6b6b;
+      --border:#2a2a4a;
+      --yellow:#fdcb6e;
+      --orange:#ff9f43;
+      --pink:#ff6b9d;
+      --blue:#54a0ff;
     }
 
-    body { display: flex; height: 100vh; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; }
+    body { display:flex; height:100vh; background:var(--bg-primary); color:var(--text-primary); overflow:hidden; }
 
+    /* АВТОРИЗАЦИЯ */
     #auth {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(135deg, #0f0f1a, #1a1a2e);
-      display: flex; justify-content: center; align-items: center; z-index: 10000;
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      background:linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%);
+      display:flex; justify-content:center; align-items:center; z-index:10000;
     }
-    #auth.hidden { display: none; }
+    #auth.hidden { display:none; }
 
     .auth-box {
-      background: var(--bg-secondary); padding: 40px; border-radius: 20px;
-      border: 1px solid var(--border); min-width: 340px;
+      background:var(--bg-secondary); padding:40px; border-radius:20px;
+      border:1px solid var(--border); min-width:380px;
+      box-shadow:0 20px 60px rgba(0,0,0,0.5);
+      animation:fadeInUp 0.5s ease;
     }
-    .auth-box h2 { font-size: 28px; margin-bottom: 8px; color: var(--accent); }
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(20px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+    .auth-box h2 { font-size:32px; margin-bottom:4px; color:var(--accent); text-align:center; }
+    .auth-box .subtitle { color:var(--text-secondary); font-size:14px; text-align:center; margin-bottom:24px; }
     .auth-box input {
-      width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border);
-      background: var(--bg-primary); color: var(--text-primary); margin-bottom: 12px;
+      width:100%; padding:14px 18px; border-radius:12px; border:2px solid var(--border);
+      background:var(--bg-primary); color:var(--text-primary); margin-bottom:16px;
+      font-size:15px; transition:all 0.3s;
     }
-    .auth-box input:focus { outline: none; border-color: var(--accent); }
+    .auth-box input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,92,231,0.2); }
     .auth-box .btn-primary {
-      width: 100%; padding: 12px; background: var(--accent); border: none; border-radius: 10px;
-      color: white; font-weight: 700; cursor: pointer;
+      width:100%; padding:14px; background:linear-gradient(135deg, var(--accent), #8b7cf7);
+      border:none; border-radius:12px; color:white; font-weight:700; font-size:16px;
+      cursor:pointer; transition:all 0.3s; margin-top:8px;
     }
-    .auth-box .btn-primary:hover { opacity: 0.8; }
-    .hidden { display: none !important; }
+    .auth-box .btn-primary:hover { transform:translateY(-2px); box-shadow:0 10px 25px rgba(108,92,231,0.4); }
+    .auth-box .btn-primary:active { transform:translateY(0); }
+    .hidden { display:none!important; }
 
-    #app { display: none; width: 100%; height: 100vh; }
-    #app.active { display: flex; }
+    #app { display:none; width:100%; height:100vh; }
+    #app.active { display:flex; }
 
+    /* САЙДБАР */
     .sidebar {
-      width: 270px; min-width: 270px; background: var(--bg-sidebar);
-      padding: 12px; overflow-y: auto; border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 8px;
+      width:300px; min-width:300px; background:var(--bg-sidebar);
+      padding:16px 12px; overflow-y:auto; border-right:1px solid var(--border);
+      display:flex; flex-direction:column; gap:8px;
     }
-    .sidebar::-webkit-scrollbar { width: 4px; }
-    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .sidebar::-webkit-scrollbar { width:6px; }
+    .sidebar::-webkit-scrollbar-track { background:transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+    .sidebar::-webkit-scrollbar-thumb:hover { background:var(--bg-hover); }
 
-    .sidebar .logo { font-size: 20px; font-weight: 800; padding: 4px 0; color: var(--accent); }
-    .sidebar .section-title { color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; margin: 8px 0 2px; }
-    .sidebar .item {
-      padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: all 0.2s;
-      color: var(--text-secondary); font-size: 13px;
+    .sidebar .logo { 
+      font-size:24px; font-weight:800; padding:8px 12px; 
+      color:var(--accent); display:flex; align-items:center; gap:10px;
+      border-bottom:1px solid var(--border); margin-bottom:8px;
     }
-    .sidebar .item:hover { background: var(--bg-hover); color: var(--text-primary); }
-    .sidebar .item.active { background: var(--bg-active); color: var(--text-primary); }
+    .sidebar .logo .logo-icon { font-size:28px; }
+    .sidebar .section-title { 
+      color:var(--text-muted); font-size:11px; font-weight:700; 
+      text-transform:uppercase; letter-spacing:1px; margin:12px 0 4px; padding:0 12px;
+    }
+    .sidebar .item {
+      padding:10px 14px; border-radius:10px; cursor:pointer; transition:all 0.2s;
+      color:var(--text-secondary); font-size:14px; margin:1px 0;
+      display:flex; align-items:center; gap:8px;
+    }
+    .sidebar .item:hover { background:var(--bg-hover); color:var(--text-primary); }
+    .sidebar .item.active { background:var(--bg-active); color:var(--text-primary); font-weight:600; }
+    .sidebar .item .item-icon { font-size:18px; width:24px; text-align:center; }
 
     .voice-channel-item {
-      padding: 8px 12px; border-radius: 8px; cursor: pointer;
-      color: var(--text-secondary); font-size: 13px;
-      display: flex; justify-content: space-between; align-items: center;
+      padding:10px 14px; border-radius:10px; cursor:pointer;
+      color:var(--text-secondary); font-size:14px;
+      display:flex; justify-content:space-between; align-items:center;
+      margin:1px 0; transition:all 0.2s;
     }
-    .voice-channel-item:hover { background: var(--bg-hover); }
-    .voice-channel-item .voice-users {
-      font-size: 11px; color: var(--text-muted);
+    .voice-channel-item:hover { background:var(--bg-hover); color:var(--text-primary); }
+    .voice-channel-item.active { background:var(--bg-active); }
+    .voice-channel-item .voice-info { display:flex; align-items:center; gap:8px; }
+    .voice-channel-item .voice-count {
+      font-size:11px; color:var(--text-muted);
+      background:var(--bg-active); padding:2px 10px; border-radius:12px;
     }
-    .voice-channel-item .voice-users .user-badge {
-      display: inline-block; background: var(--bg-active);
-      padding: 2px 8px; border-radius: 12px; margin: 2px;
-      font-size: 10px;
-    }
-    .voice-channel-item .voice-users .user-badge.speaking {
-      border: 2px solid var(--green);
-      animation: pulse-border 0.5s infinite;
-    }
-    @keyframes pulse-border {
-      0%, 100% { border-color: var(--green); opacity: 1; }
-      50% { border-color: transparent; opacity: 0.5; }
-    }
+    .voice-channel-item .voice-count.active { background:var(--green); color:#0f0f1a; }
 
     .online-user {
-      padding: 6px 10px; border-radius: 8px;
-      display: flex; justify-content: space-between; align-items: center;
+      padding:8px 12px; border-radius:10px;
+      display:flex; justify-content:space-between; align-items:center;
+      margin:1px 0; transition:all 0.2s;
     }
-    .online-user:hover { background: var(--bg-hover); }
-    .online-user .user-info { display: flex; align-items: center; gap: 8px; }
-    .online-user .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .online-user:hover { background:var(--bg-hover); }
+    .online-user .user-info { display:flex; align-items:center; gap:8px; flex:1; }
+    .online-user .status-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .online-user .status-dot.online { background:var(--green); box-shadow:0 0 8px var(--green); }
+    .online-user .status-dot.offline { background:var(--text-muted); }
+    .online-user .username-text { font-size:14px; }
     .online-user .btn-call {
-      background: var(--green); border: none; padding: 2px 10px; border-radius: 6px;
-      cursor: pointer; font-weight: 700; font-size: 11px; color: #0f0f1a;
+      background:var(--green); border:none; padding:4px 12px; border-radius:8px;
+      cursor:pointer; font-weight:700; font-size:12px; color:#0f0f1a;
+      transition:all 0.2s; opacity:0;
     }
+    .online-user:hover .btn-call { opacity:1; }
+    .online-user .btn-call:hover { transform:scale(1.05); }
 
     .friend-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 6px 10px; border-radius: 8px;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:8px 12px; border-radius:10px; margin:1px 0; transition:all 0.2s;
     }
-    .friend-item:hover { background: var(--bg-hover); }
-    .friend-item .friend-actions { display: flex; gap: 4px; }
+    .friend-item:hover { background:var(--bg-hover); }
+    .friend-item .friend-info { display:flex; align-items:center; gap:8px; flex:1; }
+    .friend-item .friend-avatar {
+      width:32px; height:32px; border-radius:50%; background:var(--bg-active);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:14px; flex-shrink:0;
+    }
+    .friend-item .friend-name { font-size:14px; }
+    .friend-item .friend-status {
+      font-size:10px; padding:2px 8px; border-radius:10px; margin-left:8px;
+    }
+    .friend-item .friend-status.online { background:rgba(0,212,160,0.2); color:var(--green); }
+    .friend-item .friend-status.offline { background:var(--bg-active); color:var(--text-muted); }
+    .friend-item .friend-actions { display:flex; gap:4px; }
     .friend-item .friend-actions button {
-      padding: 2px 10px; border: none; border-radius: 6px; cursor: pointer;
-      font-weight: 600; font-size: 11px;
+      padding:4px 10px; border:none; border-radius:8px; cursor:pointer;
+      font-weight:600; font-size:12px; transition:all 0.2s;
     }
-    .friend-item .friend-actions .btn-chat { background: var(--accent); color: white; }
-    .friend-item .friend-actions .btn-call { background: var(--green); color: #0f0f1a; }
+    .friend-item .friend-actions .btn-chat { background:var(--accent); color:white; }
+    .friend-item .friend-actions .btn-call { background:var(--green); color:#0f0f1a; }
+    .friend-item .friend-actions button:hover { transform:scale(1.05); }
 
     .search-result {
-      padding: 6px 10px; border-radius: 8px;
-      display: flex; justify-content: space-between; align-items: center;
+      padding:8px 12px; border-radius:8px;
+      display:flex; justify-content:space-between; align-items:center;
+      margin:1px 0; transition:all 0.2s;
     }
-    .search-result:hover { background: var(--bg-hover); }
+    .search-result:hover { background:var(--bg-hover); }
     .search-result .add-btn {
-      padding: 2px 12px; border: none; border-radius: 6px;
-      background: var(--green); color: #0f0f1a; cursor: pointer; font-weight: 700;
+      padding:4px 14px; border:none; border-radius:8px;
+      background:var(--green); color:#0f0f1a; cursor:pointer; font-weight:700; font-size:12px;
+      transition:all 0.2s;
     }
+    .search-result .add-btn:hover { transform:scale(1.05); }
 
-    .chat { flex: 1; display: flex; flex-direction: column; background: var(--bg-primary); min-width: 0; }
+    .btn-create-server {
+      padding:10px; border-radius:10px; border:2px dashed var(--border);
+      background:transparent; color:var(--text-muted); cursor:pointer;
+      font-weight:600; width:100%; transition:all 0.2s; font-size:13px; margin-top:4px;
+    }
+    .btn-create-server:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* ЧАТ */
+    .chat { flex:1; display:flex; flex-direction:column; background:var(--bg-primary); min-width:0; }
 
     .chat-header {
-      padding: 12px 20px; border-bottom: 1px solid var(--border);
-      display: flex; justify-content: space-between; align-items: center;
-      background: var(--bg-secondary);
+      padding:14px 24px; border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center;
+      background:var(--bg-secondary); min-height:60px; flex-wrap:wrap; gap:12px;
     }
-    .chat-title { font-size: 16px; font-weight: 700; }
-    .private-badge { background: var(--accent); padding: 2px 12px; border-radius: 20px; font-size: 10px; color: white; margin-left: 10px; }
-    .voice-controls button {
-      padding: 6px 14px; border: none; border-radius: 8px; cursor: pointer;
-      font-weight: 600; font-size: 12px; margin-left: 6px;
+    .chat-header-left { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .chat-title { font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .chat-title .channel-icon { font-size:20px; }
+    .private-badge { 
+      background:var(--accent); padding:3px 14px; border-radius:20px; 
+      font-size:11px; color:white; margin-left:8px; font-weight:600;
     }
-    .btn-voice { background: var(--green); color: #0f0f1a; }
-    .btn-voice.active { background: var(--red); color: white; }
+
+    .typing-indicator {
+      display:none; align-items:center; gap:6px;
+      font-size:12px; color:var(--green); padding:4px 14px;
+      background:rgba(0,212,160,0.1); border-radius:20px;
+      animation:fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+    .typing-indicator.active { display:inline-flex; }
+    .typing-dots { display:inline-flex; gap:3px; align-items:center; }
+    .typing-dots span {
+      display:inline-block; width:5px; height:5px; background:var(--green);
+      border-radius:50%; animation:typingBounce 1.4s infinite ease-in-out;
+    }
+    .typing-dots span:nth-child(2) { animation-delay:0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay:0.4s; }
+    @keyframes typingBounce {
+      0%,80%,100% { transform:translateY(0); }
+      40% { transform:translateY(-8px); }
+    }
 
     .messages {
-      flex: 1; padding: 16px 20px; overflow-y: auto;
-      display: flex; flex-direction: column; gap: 4px;
+      flex:1; padding:20px 24px; overflow-y:auto;
+      display:flex; flex-direction:column; gap:6px;
+      background:linear-gradient(180deg, var(--bg-primary) 0%, rgba(15,15,26,0.95) 100%);
     }
+    .messages::-webkit-scrollbar { width:8px; }
+    .messages::-webkit-scrollbar-track { background:transparent; }
+    .messages::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+    .messages::-webkit-scrollbar-thumb:hover { background:var(--bg-hover); }
+
     .message {
-      padding: 6px 14px; background: var(--bg-secondary); border-radius: 10px;
-      max-width: 75%; word-wrap: break-word; animation: messageIn 0.2s ease;
+      padding:8px 16px; background:var(--bg-secondary); border-radius:12px;
+      max-width:70%; word-wrap:break-word; animation:messageIn 0.3s ease;
+      border:1px solid transparent; transition:all 0.2s;
     }
-    .message.own { align-self: flex-end; background: var(--bg-active); }
-    @keyframes messageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-    .message .msg-user { font-weight: 700; color: var(--accent); font-size: 12px; }
-    .message .msg-text { margin-top: 2px; font-size: 13px; }
+    .message:hover { border-color:var(--border); }
+    .message.own { align-self:flex-end; background:var(--bg-active); }
+    @keyframes messageIn { 
+      from{opacity:0; transform:translateY(10px);} 
+      to{opacity:1; transform:translateY(0);} 
+    }
+    .message .msg-user { font-weight:700; color:var(--accent); font-size:12px; margin-bottom:4px; }
+    .message .msg-time { font-size:10px; color:var(--text-muted); float:right; margin-left:8px; }
+    .message .msg-text { font-size:14px; line-height:1.4; }
 
     .input-area {
-      padding: 12px 20px; border-top: 1px solid var(--border);
-      display: flex; gap: 10px; background: var(--bg-secondary);
+      padding:14px 24px; border-top:1px solid var(--border);
+      display:flex; gap:10px; background:var(--bg-secondary); align-items:center;
+      position:relative;
     }
     .input-area input {
-      flex: 1; padding: 10px 16px; border-radius: 10px;
-      border: 1px solid var(--border); background: var(--bg-primary);
-      color: var(--text-primary); font-size: 13px;
+      flex:1; padding:12px 18px; border-radius:12px;
+      border:2px solid var(--border); background:var(--bg-primary);
+      color:var(--text-primary); font-size:14px; transition:all 0.3s;
     }
-    .input-area input:focus { outline: none; border-color: var(--accent); }
-    .input-area button {
-      padding: 10px 24px; border-radius: 10px; border: none;
-      background: var(--accent); color: white; font-weight: 700; cursor: pointer;
+    .input-area input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,92,231,0.2); }
+    .input-area input::placeholder { color:var(--text-muted); }
+    
+    .emoji-btn {
+      background:transparent; border:none; font-size:26px; cursor:pointer;
+      padding:8px 12px; border-radius:10px; transition:all 0.2s;
     }
+    .emoji-btn:hover { background:var(--bg-hover); transform:scale(1.1); }
+    
+    .input-area .send-btn {
+      padding:12px 28px; border-radius:12px; border:none;
+      background:linear-gradient(135deg, var(--accent), #8b7cf7);
+      color:white; font-weight:700; cursor:pointer; font-size:14px;
+      transition:all 0.3s;
+    }
+    .input-area .send-btn:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(108,92,231,0.4); }
+    .input-area .send-btn:active { transform:translateY(0); }
 
-    /* === ОКНО ЗВОНКА === */
-    #call-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
-      display: none; justify-content: center; align-items: center; z-index: 9999;
+    .emoji-picker {
+      display:none; position:absolute; bottom:80px; right:120px;
+      background:var(--bg-secondary); border:1px solid var(--border);
+      border-radius:16px; padding:14px; z-index:100;
+      grid-template-columns:repeat(10,1fr); gap:6px;
+      max-width:450px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+      animation:slideUp 0.2s ease;
     }
-    #call-overlay.active { display: flex; }
+    @keyframes slideUp {
+      from{opacity:0; transform:translateY(10px);}
+      to{opacity:1; transform:translateY(0);}
+    }
+    .emoji-picker.show { display:grid; }
+    .emoji-picker span {
+      font-size:28px; cursor:pointer; padding:8px; border-radius:10px;
+      text-align:center; transition:all 0.2s; user-select:none;
+    }
+    .emoji-picker span:hover { background:var(--bg-hover); transform:scale(1.2); }
+
+    /* ОКНО ЗВОНКА */
+    #call-overlay {
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.9); backdrop-filter:blur(12px);
+      display:none; justify-content:center; align-items:center; z-index:9999;
+    }
+    #call-overlay.active { display:flex; }
 
     #call-window {
-      background: var(--bg-secondary); border-radius: 20px;
-      padding: 40px; text-align: center; min-width: 340px;
-      border: 1px solid var(--border); animation: callIn 0.3s ease;
+      background:var(--bg-secondary); border-radius:24px;
+      padding:48px; text-align:center; min-width:420px; max-width:500px;
+      border:1px solid var(--border); animation:callIn 0.4s ease;
+      box-shadow:0 30px 80px rgba(0,0,0,0.7);
     }
-    @keyframes callIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-    #call-window .caller-avatar { font-size: 60px; display: block; margin-bottom: 8px; }
-    #call-window .caller-name { font-size: 24px; font-weight: 700; }
-    #call-window .call-status { color: var(--text-secondary); margin-bottom: 16px; }
-    #call-window .call-timer { font-size: 32px; font-weight: 700; color: var(--green); margin-bottom: 16px; }
+    @keyframes callIn { 
+      from{opacity:0; transform:scale(0.9) translateY(20px);} 
+      to{opacity:1; transform:scale(1) translateY(0);} 
+    }
+    #call-window .caller-avatar { 
+      font-size:90px; display:block;
+      width:140px; height:140px; line-height:140px;
+      border-radius:50%; background:linear-gradient(135deg, var(--bg-active), var(--accent));
+      margin:0 auto 20px; font-weight:700;
+      border:4px solid var(--accent); box-shadow:0 10px 30px rgba(108,92,231,0.3);
+      animation:avatarPulse 2s infinite;
+    }
+    @keyframes avatarPulse {
+      0%,100% { box-shadow:0 10px 30px rgba(108,92,231,0.3); }
+      50% { box-shadow:0 10px 40px rgba(108,92,231,0.6); }
+    }
+    #call-window .caller-name { font-size:28px; font-weight:700; margin-bottom:8px; }
+    #call-window .call-status { color:var(--text-secondary); margin-bottom:20px; font-size:15px; }
+    #call-window .call-timer { font-size:36px; font-weight:700; color:var(--green); margin-bottom:20px; font-variant-numeric:tabular-nums; }
 
-    #call-window .call-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    #call-window .call-buttons { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; margin:20px 0; }
     #call-window .call-buttons button {
-      padding: 10px 24px; border: none; border-radius: 50px;
-      font-size: 14px; font-weight: 700; cursor: pointer;
+      padding:14px 32px; border:none; border-radius:50px;
+      font-size:15px; font-weight:700; cursor:pointer; transition:all 0.3s;
+      min-width:150px; display:flex; align-items:center; gap:8px; justify-content:center;
     }
-    .btn-accept { background: var(--green); color: #0f0f1a; }
-    .btn-reject { background: var(--red); color: white; }
-    .btn-end { background: var(--red); color: white; }
-    .btn-mute { background: var(--bg-hover); color: var(--text-primary); }
-    .btn-cancel { background: #fdcb6e; color: #0f0f1a; }
+    .btn-accept { background:linear-gradient(135deg, var(--green), #00b894); color:#0f0f1a; }
+    .btn-reject { background:linear-gradient(135deg, var(--red), #ff5252); color:white; }
+    .btn-end { background:linear-gradient(135deg, var(--red), #ff5252); color:white; }
+    .btn-mute { background:var(--bg-hover); color:var(--text-primary); border:2px solid var(--border)!important; }
+    .btn-mute.muted { background:var(--red); color:white; border-color:var(--red)!important; }
+    .btn-cancel { background:linear-gradient(135deg, var(--yellow), #f39c12); color:#0f0f1a; }
+    #call-window .call-buttons button:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,0.4); }
 
-    .voice-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 6px; }
-    .voice-indicator.speaking { background: var(--green); animation: pulse 0.3s infinite alternate; }
-    .voice-indicator.silent { background: var(--text-muted); }
-    @keyframes pulse { 0% { opacity: 0.5; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1.2); } }
-
-    /* Ringtones */
     .ringing {
-      animation: ring 0.5s infinite alternate;
+      animation:ring 0.6s infinite alternate;
     }
     @keyframes ring {
-      0% { transform: scale(1); }
-      100% { transform: scale(1.05); }
+      0% { transform:scale(1); box-shadow:0 0 0 0 rgba(0,212,160,0.5); }
+      100% { transform:scale(1.03); box-shadow:0 0 30px 15px rgba(0,212,160,0.3); }
+    }
+
+    .voice-indicator {
+      display:inline-block; width:16px; height:16px;
+      border-radius:50%; margin:0 8px; vertical-align:middle;
+      transition:all 0.3s;
+    }
+    .voice-indicator.speaking { 
+      background:var(--green); 
+      animation:voicePulse 0.5s infinite alternate;
+      box-shadow:0 0 15px var(--green);
+    }
+    .voice-indicator.silent { background:var(--text-muted); }
+    .voice-indicator.muted { background:var(--red); }
+    @keyframes voicePulse { 
+      0% { opacity:0.6; transform:scale(0.8); } 
+      100% { opacity:1; transform:scale(1.4); } 
+    }
+
+    .audio-visualizer {
+      display:flex; gap:3px; justify-content:center;
+      margin:20px 0; height:50px; align-items:flex-end;
+    }
+    .audio-bar {
+      width:5px; background:linear-gradient(180deg, var(--green), var(--accent));
+      border-radius:3px; transition:height 0.08s ease; min-height:3px;
+    }
+
+    .call-status-indicator {
+      display:inline-flex; align-items:center; gap:10px;
+      padding:10px 20px; background:var(--bg-active);
+      border-radius:24px; margin:12px 0; font-size:14px;
+    }
+    .call-status-indicator .dot {
+      width:12px; height:12px; border-radius:50%;
+    }
+    .call-status-indicator .dot.connected { background:var(--green); animation:voicePulse 1s infinite; }
+    .call-status-indicator .dot.ringing { background:var(--yellow); animation:voicePulse 0.5s infinite; }
+
+    .volume-control {
+      display:flex; align-items:center; gap:12px;
+      color:var(--text-secondary); font-size:13px; margin:16px 0; justify-content:center;
+    }
+    .volume-control input[type="range"] {
+      width:140px; height:6px; -webkit-appearance:none; appearance:none;
+      background:var(--bg-active); border-radius:3px; outline:none;
+    }
+    .volume-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance:none; appearance:none;
+      width:20px; height:20px; background:var(--green);
+      border-radius:50%; cursor:pointer; transition:all 0.2s;
+    }
+    .volume-control input[type="range"]::-webkit-slider-thumb:hover { transform:scale(1.2); }
+
+    .last-seen { font-size:10px; color:var(--text-muted); margin-left:4px; font-style:italic; }
+
+    /* Адаптив */
+    @media (max-width:768px) {
+      .sidebar { width:240px; min-width:240px; }
+      #call-window { min-width:90vw; padding:30px; }
+      .chat-header { padding:10px 16px; }
+      .messages { padding:12px 16px; }
     }
   </style>
 </head>
@@ -219,62 +407,100 @@
 <!-- ===== АВТОРИЗАЦИЯ ===== -->
 <div id="auth">
   <div class="auth-box" id="login">
-    <h2>💬 Discord</h2>
-    <input id="login-username" placeholder="Имя пользователя" />
-    <input id="login-password" type="password" placeholder="Пароль" />
+    <h2>💬 Discord Clone</h2>
+    <p class="subtitle">Общайся с друзьями в реальном времени</p>
+    <input id="login-username" placeholder="👤 Имя пользователя" autocomplete="username" />
+    <input id="login-password" type="password" placeholder="🔒 Пароль" autocomplete="current-password" />
     <button class="btn-primary" onclick="login()">🚀 Войти</button>
-    <span style="display:block;text-align:center;margin-top:12px;color:var(--text-secondary);">Нет аккаунта? <a onclick="showRegister()" style="color:var(--accent);cursor:pointer;">Регистрация</a></span>
+    <span style="display:block;text-align:center;margin-top:16px;color:var(--text-secondary);font-size:14px;">
+      Нет аккаунта? <a onclick="showRegister()" style="color:var(--accent);cursor:pointer;font-weight:700;">Зарегистрироваться</a>
+    </span>
   </div>
   <div class="auth-box hidden" id="register">
-    <h2>💬 Discord</h2>
-    <input id="reg-username" placeholder="Имя пользователя" />
-    <input id="reg-password" type="password" placeholder="Пароль" />
-    <button class="btn-primary" onclick="register()">🎉 Регистрация</button>
-    <span style="display:block;text-align:center;margin-top:12px;color:var(--text-secondary);">Уже есть аккаунт? <a onclick="showLogin()" style="color:var(--accent);cursor:pointer;">Войти</a></span>
+    <h2>💬 Discord Clone</h2>
+    <p class="subtitle">Создай аккаунт и начни общение</p>
+    <input id="reg-username" placeholder="👤 Придумай имя" autocomplete="username" />
+    <input id="reg-password" type="password" placeholder="🔒 Придумай пароль" autocomplete="new-password" />
+    <button class="btn-primary" onclick="register()">🎉 Зарегистрироваться</button>
+    <span style="display:block;text-align:center;margin-top:16px;color:var(--text-secondary);font-size:14px;">
+      Уже есть аккаунт? <a onclick="showLogin()" style="color:var(--accent);cursor:pointer;font-weight:700;">Войти</a>
+    </span>
   </div>
 </div>
 
 <!-- ===== ОСНОВНОЙ ИНТЕРФЕЙС ===== -->
 <div id="app">
+  <!-- САЙДБАР -->
   <div class="sidebar">
-    <div class="logo">💬 Discord</div>
+    <div class="logo">
+      <span class="logo-icon">💬</span>
+      Discord Clone
+    </div>
     
-    <div class="section-title">📡 СЕРВЕРА</div>
+    <div class="section-title">📡 Сервера</div>
     <div id="servers-list"></div>
     
-    <div style="display:flex;gap:4px;">
-      <input id="server-search" placeholder="🔍 Поиск..." style="flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);" oninput="searchServers(this.value)" />
-      <button onclick="searchServers(document.getElementById('server-search').value)" style="padding:6px 12px;border-radius:8px;border:none;background:var(--accent);color:white;cursor:pointer;">Искать</button>
+    <div style="display:flex;gap:6px;">
+      <input id="server-search" placeholder="🔍 Поиск серверов..." style="flex:1;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:13px;" oninput="searchServers(this.value)" />
+      <button onclick="searchServers(document.getElementById('server-search').value)" style="padding:8px 14px;border-radius:10px;border:none;background:var(--accent);color:white;cursor:pointer;font-weight:700;font-size:13px;">🔍</button>
     </div>
     <div id="server-search-results"></div>
     
-    <div style="display:flex;gap:4px;">
-      <input id="invite-code" placeholder="🔑 Код" style="flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);text-transform:uppercase;" />
-      <button onclick="joinServerByInvite()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--green);color:#0f0f1a;cursor:pointer;font-weight:700;">➕</button>
+    <div style="display:flex;gap:6px;">
+      <input id="invite-code" placeholder="🔑 Код приглашения" style="flex:1;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);text-transform:uppercase;font-size:13px;" />
+      <button onclick="joinServerByInvite()" style="padding:8px 14px;border-radius:10px;border:none;background:var(--green);color:#0f0f1a;cursor:pointer;font-weight:700;font-size:13px;">➕</button>
     </div>
     
-    <button class="btn-create-server" onclick="createServer()" style="padding:8px;border-radius:8px;border:2px dashed var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;font-weight:600;width:100%;">➕ Создать сервер</button>
+    <button class="btn-create-server" onclick="createServer()">➕ Создать новый сервер</button>
     
-    <div class="section-title" style="margin-top:12px;">👥 ДРУЗЬЯ</div>
+    <div class="section-title">👥 Друзья</div>
     <div id="friends-list"></div>
     
-    <div class="section-title" style="margin-top:8px;">🔍 НАЙТИ</div>
-    <input id="search-user" placeholder="Поиск пользователей..." oninput="searchUsers()" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);" />
+    <div class="section-title">🔍 Найти людей</div>
+    <input id="search-user" placeholder="Поиск по имени..." oninput="searchUsers()" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:13px;" />
     <div id="search-results"></div>
     
-    <div class="section-title" style="margin-top:12px;">🟢 ОНЛАЙН</div>
+    <div class="section-title">🟢 Сейчас онлайн</div>
     <div id="users-list"></div>
+    
+    <div style="margin-top:auto;padding:12px 0;border-top:1px solid var(--border);">
+      <div class="online-user" style="cursor:default;">
+        <div class="user-info">
+          <span class="status-dot online"></span>
+          <span class="username-text" id="current-username-display"></span>
+        </div>
+        <button onclick="logout()" style="background:var(--red);border:none;padding:4px 12px;border-radius:8px;color:white;cursor:pointer;font-size:11px;font-weight:600;">Выйти</button>
+      </div>
+    </div>
   </div>
 
+  <!-- ЧАТ -->
   <div class="chat">
     <div class="chat-header" id="chat-header">
-      <div class="chat-title" id="chat-title"># general</div>
+      <div class="chat-header-left">
+        <div class="chat-title" id="chat-title">
+          <span class="channel-icon">#</span> general
+        </div>
+        <div class="typing-indicator" id="typing-indicator">
+          <span id="typing-username"></span> печатает
+          <span class="typing-dots"><span></span><span></span><span></span></span>
+        </div>
+      </div>
       <div id="voice-controls"></div>
     </div>
-    <div class="messages" id="messages"></div>
+    
+    <div class="messages" id="messages">
+      <div style="text-align:center;color:var(--text-muted);padding:40px;font-size:14px;">
+        <div style="font-size:40px;margin-bottom:12px;">💬</div>
+        Выберите канал и начните общение
+      </div>
+    </div>
+    
     <div class="input-area">
-      <input id="message-input" placeholder="💬 Напиши сообщение..." />
-      <button onclick="sendMessage()">Отправить</button>
+      <input id="message-input" placeholder="💬 Напишите сообщение..." oninput="handleTyping()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}" />
+      <button class="emoji-btn" onclick="toggleEmojiPicker()" title="Эмодзи">😀</button>
+      <button class="send-btn" onclick="sendMessage()">📤 Отправить</button>
+      <div class="emoji-picker" id="emoji-picker"></div>
     </div>
   </div>
 </div>
@@ -282,21 +508,30 @@
 <!-- ===== ОКНО ЗВОНКА ===== -->
 <div id="call-overlay">
   <div id="call-window">
-    <span class="caller-avatar" id="caller-avatar">👤</span>
-    <div class="caller-name" id="caller-name">Имя</div>
+    <div class="caller-avatar" id="caller-avatar">👤</div>
+    <div class="caller-name" id="caller-name">
+      Имя пользователя
+      <span class="voice-indicator silent" id="call-voice-indicator"></span>
+    </div>
     <div class="call-status" id="call-status">Звонок...</div>
+    <div class="audio-visualizer" id="audio-visualizer"></div>
     <div class="call-timer" id="call-timer">00:00</div>
+    <div class="volume-control">
+      <span>🔈</span>
+      <input type="range" id="remote-volume" min="0" max="100" value="80" oninput="setRemoteVolume(this.value)" />
+      <span>🔊</span>
+    </div>
     <div class="call-buttons" id="call-buttons"></div>
   </div>
 </div>
 
 <script>
 // ============================================================
-//  ПЕРЕМЕННЫЕ
+//  ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
 // ============================================================
 let socket, currentUser, currentChannel, currentServer, token;
 let localStream = null;
-let peerConnections = {};
+let peerConnection = null;
 let callInProgress = false;
 let currentCallerId = null;
 let currentCallerUsername = null;
@@ -309,25 +544,229 @@ let callSeconds = 0;
 let inVoiceChannel = false;
 let currentVoiceChannelId = null;
 let voicePeerConnections = {};
-let ringtoneAudio = null;
+let remoteAudioElement = null;
+let audioContext = null, audioAnalyser = null, visualizerInterval = null;
+let melodyInterval = null, currentMelody = 1;
+let typingTimeout = null;
 
 // ============================================================
-//  АУДИО ДЛЯ ЗВОНКА
+//  ЭМОДЗИ
 // ============================================================
-function playRingtone() {
+const EMOJI_LIST = [
+  '😀','😂','🤣','😍','😎','🤔','😢','😡','👍','👎',
+  '🎉','🔥','❤️','💔','⭐','✨','💬','📞','🎤','🔊',
+  '🔇','✅','❌','➡️','⬅️','🙏','💪','🤝','👋','💻',
+  '📱','🎵','🎶','🎼','🎧','🎮','🎯','🎨','🎭','🌈',
+  '🍕','🍔','☕','🎂','🚀','💡','💰','🎁','🏆','🌟',
+  '😊','🥰','😘','🤗','🫡','🥳','😴','🤯','😇','💩'
+];
+
+function toggleEmojiPicker() {
+  const picker = document.getElementById('emoji-picker');
+  if (picker.classList.contains('show')) {
+    picker.classList.remove('show');
+    return;
+  }
+  picker.innerHTML = EMOJI_LIST.map(e => 
+    `<span onclick="insertEmoji('${e}')" title="${e}">${e}</span>`
+  ).join('');
+  picker.classList.add('show');
+}
+
+function insertEmoji(emoji) {
+  const input = document.getElementById('message-input');
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  input.value = input.value.substring(0, start) + emoji + input.value.substring(end);
+  input.selectionStart = input.selectionEnd = start + emoji.length;
+  input.focus();
+  document.getElementById('emoji-picker').classList.remove('show');
+  handleTyping();
+}
+
+// ============================================================
+//  ЗВУКИ И МЕЛОДИИ
+// ============================================================
+function playMelody1() {
   try {
-    ringtoneAudio = new Audio('data:audio/wav;base64,UklGRlwAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YVoAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=');
-    ringtoneAudio.loop = true;
-    ringtoneAudio.volume = 0.7;
-    ringtoneAudio.play().catch(e => console.log('Ringtone error:', e));
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [{f:440,d:0.15},{f:550,d:0.15},{f:440,d:0.15},{f:550,d:0.15}];
+    let t = ctx.currentTime;
+    notes.forEach(n => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'square'; o.frequency.value = n.f;
+      g.gain.setValueAtTime(0.25, t);
+      g.gain.exponentialRampToValueAtTime(0.01, t+n.d);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t+n.d); t += n.d;
+    });
+    setTimeout(() => ctx.close(), 1000);
   } catch(e) {}
 }
 
+function playMelody2() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [{f:523,d:0.12},{f:659,d:0.12},{f:784,d:0.12},{f:1047,d:0.25}].forEach(n => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = n.f;
+      g.gain.setValueAtTime(0.25, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+n.d);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime+n.d);
+    });
+    setTimeout(() => ctx.close(), 800);
+  } catch(e) {}
+}
+
+function playMelody3() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [800,1000,800,600].forEach((f,i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.3, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+[0.1,0.1,0.1,0.2][i]);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime+[0.1,0.1,0.1,0.2][i]);
+    });
+    setTimeout(() => ctx.close(), 800);
+  } catch(e) {}
+}
+
+function playRingtone() {
+  stopRingtone();
+  const melodies = [playMelody1, playMelody2, playMelody3];
+  const intervals = [1000, 1100, 1200];
+  melodies[currentMelody-1]();
+  melodyInterval = setInterval(melodies[currentMelody-1], intervals[currentMelody-1]);
+  currentMelody = currentMelody % 3 + 1;
+}
+
 function stopRingtone() {
-  if (ringtoneAudio) {
-    ringtoneAudio.pause();
-    ringtoneAudio = null;
-  }
+  if (melodyInterval) { clearInterval(melodyInterval); melodyInterval = null; }
+}
+
+function playConnectSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(440, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(880, ctx.currentTime+0.15);
+    g.gain.setValueAtTime(0.3, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.4);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime+0.4);
+    setTimeout(() => ctx.close(), 500);
+  } catch(e) {}
+}
+
+function playDisconnectSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(880, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(440, ctx.currentTime+0.15);
+    g.gain.setValueAtTime(0.3, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+0.4);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime+0.4);
+    setTimeout(() => ctx.close(), 500);
+  } catch(e) {}
+}
+
+// ============================================================
+//  ВИЗУАЛИЗАЦИЯ АУДИО И ИНДИКАТОР ГОЛОСА
+// ============================================================
+function startAudioVisualization(stream) {
+  stopAudioVisualization();
+  try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContext.createMediaStreamSource(stream);
+    audioAnalyser = audioContext.createAnalyser();
+    audioAnalyser.fftSize = 32;
+    source.connect(audioAnalyser);
+    
+    const visualizer = document.getElementById('audio-visualizer');
+    if (!visualizer) return;
+    visualizer.innerHTML = '';
+    for (let i = 0; i < 20; i++) {
+      const bar = document.createElement('div');
+      bar.className = 'audio-bar';
+      bar.style.height = '5px';
+      visualizer.appendChild(bar);
+    }
+    
+    const bars = visualizer.querySelectorAll('.audio-bar');
+    const dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+    
+    visualizerInterval = setInterval(() => {
+      if (!audioAnalyser) return;
+      audioAnalyser.getByteFrequencyData(dataArray);
+      bars.forEach((bar, i) => {
+        bar.style.height = Math.max(3, dataArray[i] / 1.5) + 'px';
+      });
+    }, 80);
+  } catch(e) { console.error('Visualization error:', e); }
+}
+
+function stopAudioVisualization() {
+  if (visualizerInterval) { clearInterval(visualizerInterval); visualizerInterval = null; }
+  const vis = document.getElementById('audio-visualizer');
+  if (vis) vis.innerHTML = '';
+  audioAnalyser = null;
+}
+
+function updateVoiceIndicator(element, stream) {
+  if (!stream || !element) return;
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    const source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
+    const checkSpeaking = () => {
+      if (!callInProgress && !inVoiceChannel) {
+        element.classList.add('silent');
+        element.classList.remove('speaking');
+        return;
+      }
+      analyser.getByteFrequencyData(dataArray);
+      const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+      if (avg > 25) {
+        element.classList.add('speaking');
+        element.classList.remove('silent');
+      } else {
+        element.classList.add('silent');
+        element.classList.remove('speaking');
+      }
+      requestAnimationFrame(checkSpeaking);
+    };
+    checkSpeaking();
+  } catch(e) { console.error('Indicator error:', e); }
+}
+
+// ============================================================
+//  ФОРМАТИРОВАНИЕ ВРЕМЕНИ
+// ============================================================
+function formatLastSeen(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now - date) / 1000);
+  if (diff < 60) return 'был(а) только что';
+  if (diff < 3600) return `был(а) ${Math.floor(diff/60)} мин. назад`;
+  if (diff < 86400) return `был(а) ${Math.floor(diff/3600)} ч. назад`;
+  return `был(а) ${date.toLocaleDateString()}`;
+}
+
+function formatTime(dateStr) {
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
 }
 
 // ============================================================
@@ -345,14 +784,17 @@ function showLogin() {
 async function register() {
   const username = document.getElementById('reg-username').value.trim();
   const password = document.getElementById('reg-password').value;
-  if (!username || !password) return alert('Заполни все поля!');
+  if (!username || !password) return alert('❌ Заполни все поля!');
+  if (username.length < 3) return alert('❌ Имя должно быть минимум 3 символа');
+  if (password.length < 4) return alert('❌ Пароль должен быть минимум 4 символа');
+  
   const res = await fetch('/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username,password})
   });
-  if (res.ok) { alert('✅ Зарегистрирован!'); showLogin(); }
-  else alert('❌ Пользователь уже существует');
+  if (res.ok) { alert('✅ Регистрация успешна! Теперь войди.'); showLogin(); }
+  else { const err = await res.json(); alert('❌ ' + err.error); }
 }
 
 function loadSavedLogin() {
@@ -362,24 +804,22 @@ function loadSavedLogin() {
       const data = JSON.parse(saved);
       document.getElementById('login-username').value = data.username || '';
       document.getElementById('login-password').value = data.password || '';
-      if (data.username && data.password) setTimeout(() => login(), 300);
     } catch(e) {}
   }
 }
-
 function saveLogin(username, password) {
-  localStorage.setItem('discord_user', JSON.stringify({ username, password }));
+  localStorage.setItem('discord_user', JSON.stringify({username,password}));
 }
 
 async function login() {
   const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value;
-  if (!username || !password) return alert('Введи логин и пароль!');
+  if (!username || !password) return alert('❌ Введи логин и пароль!');
   
   const res = await fetch('/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username,password})
   });
   const data = await res.json();
   if (data.token) {
@@ -388,31 +828,49 @@ async function login() {
     saveLogin(username, password);
     document.getElementById('auth').classList.add('hidden');
     document.getElementById('app').classList.add('active');
+    document.getElementById('current-username-display').textContent = username;
     initSocket();
     loadServers();
     loadFriends();
   } else {
-    alert('❌ Неверный логин или пароль');
+    alert('❌ ' + (data.error || 'Неверный логин или пароль'));
   }
+}
+
+function logout() {
+  if (callInProgress) endCall();
+  if (inVoiceChannel) leaveVoiceChannel();
+  if (socket) socket.disconnect();
+  localStorage.removeItem('discord_user');
+  location.reload();
 }
 
 // ============================================================
 //  WEBSOCKET
 // ============================================================
 function initSocket() {
-  socket = io();
+  socket = io({ transports: ['websocket', 'polling'] });
+  
   socket.on('connect', () => {
-    socket.emit('join', { userId: currentUser.id, username: currentUser.username });
+    console.log('✅ Подключен к серверу');
+    socket.emit('join', { userId:currentUser.id, username:currentUser.username });
   });
 
   socket.on('users', (users) => {
     const list = document.getElementById('users-list');
     list.innerHTML = users.filter(u => u.userId !== currentUser.id).map(u => `
       <div class="online-user" data-socketid="${u.socketId}" data-userid="${u.userId}" data-username="${u.username}">
-        <div class="user-info"><span class="status-dot"></span>${u.username}</div>
-        <button class="btn-call" onclick="startCall('${u.socketId}', '${u.username}')">📞</button>
+        <div class="user-info">
+          <span class="status-dot online"></span>
+          <span class="username-text">${u.username}</span>
+        </div>
+        <button class="btn-call" onclick="startCall('${u.socketId}','${u.username}')" title="Позвонить">📞</button>
       </div>
     `).join('');
+    if (users.filter(u => u.userId !== currentUser.id).length === 0) {
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;">Пока никого нет онлайн</div>';
+    }
+    loadFriends();
   });
 
   socket.on('message', addMessage);
@@ -425,212 +883,201 @@ function initSocket() {
     if (isPrivateChat) addPrivateMessage(data);
   });
 
-  // ===== ГОЛОСОВЫЕ КАНАЛЫ =====
-  socket.on('voice-users', (users) => {
-    updateVoiceUsers(users);
-  });
+  // Индикатор печатает
+  socket.on('user-typing', ({username}) => showTyping(username));
+  socket.on('user-stop-typing', hideTyping);
+  socket.on('private-user-typing', ({username}) => showTyping(username));
+  socket.on('private-user-stop-typing', hideTyping);
 
-  socket.on('voice-offer', async ({ from, offer }) => {
-    if (voicePeerConnections[from]) {
-      try {
-        await voicePeerConnections[from].setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await voicePeerConnections[from].createAnswer();
-        await voicePeerConnections[from].setLocalDescription(answer);
-        socket.emit('voice-answer', { to: from, answer });
-      } catch(e) { console.error('Voice offer error:', e); }
-    }
-  });
+  // Голосовые каналы
+  socket.on('voice-users', updateVoiceUsers);
+  socket.on('voice-offer', async ({from,offer}) => await handleVoiceOffer(from,offer));
+  socket.on('voice-answer', async ({from,answer}) => await handleVoiceAnswer(from,answer));
+  socket.on('voice-ice', async ({from,candidate}) => await handleVoiceICE(from,candidate));
 
-  socket.on('voice-answer', async ({ from, answer }) => {
-    if (voicePeerConnections[from]) {
-      try {
-        await voicePeerConnections[from].setRemoteDescription(new RTCSessionDescription(answer));
-      } catch(e) { console.error('Voice answer error:', e); }
-    }
-  });
-
-  socket.on('voice-ice', async ({ from, candidate }) => {
-    if (voicePeerConnections[from]) {
-      try {
-        await voicePeerConnections[from].addIceCandidate(new RTCIceCandidate(candidate));
-      } catch(e) { console.error('ICE error:', e); }
-    }
-  });
-
-  // ===== ЛИЧНЫЕ ЗВОНКИ =====
+  // Личные звонки
   socket.on('incoming-call', (data) => {
+    console.log('📞 Входящий звонок от:', data.fromUsername);
     currentCallerId = data.from;
     currentCallerUsername = data.fromUsername || 'Неизвестный';
     playRingtone();
     showCallWindow('incoming');
   });
-
   socket.on('call-connected', () => {
+    console.log('✅ Звонок принят');
     stopRingtone();
-    startTimer();
-    showCallWindow('active');
+    playConnectSound();
+    if (!callInProgress) createOffer();
   });
-
-  socket.on('call-failed', (data) => {
+  socket.on('call-rejected', () => {
     stopRingtone();
-    alert('❌ ' + (data.reason || 'Не удалось дозвониться'));
+    playDisconnectSound();
+    alert('❌ Звонок отклонён');
     endCall();
   });
-
   socket.on('call-ended', () => {
     stopRingtone();
+    playDisconnectSound();
     endCall();
   });
-
-  socket.on('call-offer', async ({ from, offer }) => {
-    if (callInProgress && peerConnections[from]) {
-      try {
-        await peerConnections[from].setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await peerConnections[from].createAnswer();
-        await peerConnections[from].setLocalDescription(answer);
-        socket.emit('call-answer', { to: from, answer });
-      } catch(e) { console.error('Call offer error:', e); }
-    }
-  });
-
-  socket.on('call-answer', async ({ from, answer }) => {
-    if (peerConnections[from]) {
-      try {
-        await peerConnections[from].setRemoteDescription(new RTCSessionDescription(answer));
-      } catch(e) { console.error('Call answer error:', e); }
-    }
-  });
-
-  socket.on('call-ice', async ({ from, candidate }) => {
-    if (peerConnections[from]) {
-      try {
-        await peerConnections[from].addIceCandidate(new RTCIceCandidate(candidate));
-      } catch(e) { console.error('ICE error:', e); }
-    }
-  });
+  socket.on('call-offer', async ({from,offer}) => await handleOffer(from,offer));
+  socket.on('call-answer', async ({from,answer}) => await handleAnswer(from,answer));
+  socket.on('call-ice', async ({from,candidate}) => await handleICE(from,candidate));
 }
 
 // ============================================================
-//  СЕРВЕРА
+//  СЕРВЕРА И КАНАЛЫ
 // ============================================================
 async function loadServers() {
-  const res = await fetch(`/servers/${currentUser.id}`);
-  const servers = await res.json();
-  document.getElementById('servers-list').innerHTML = servers.map(s => 
-    `<div class="item" onclick="selectServer(${s.id})"># ${s.name}</div>`
-  ).join('');
-  if (servers.length) selectServer(servers[0].id);
+  try {
+    const res = await fetch(`/servers/${currentUser.id}`);
+    const servers = await res.json();
+    const list = document.getElementById('servers-list');
+    if (servers.length === 0) {
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;">Нет серверов. Создай или присоединись!</div>';
+      return;
+    }
+    list.innerHTML = servers.map(s => 
+      `<div class="item" onclick="selectServer(${s.id})">
+        <span class="item-icon">#</span> ${s.name}
+      </div>`
+    ).join('');
+    selectServer(servers[0].id);
+  } catch(e) { console.error('Load servers error:', e); }
 }
 
 async function createServer() {
   const name = prompt('📝 Название сервера:');
-  if (!name) return;
-  const res = await fetch('/servers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, owner_id: currentUser.id })
-  });
-  const data = await res.json();
-  alert(`✅ Сервер создан! 🔑 Код: ${data.invite_code}`);
-  loadServers();
+  if (!name || name.trim().length < 2) return;
+  try {
+    const res = await fetch('/servers', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:name.trim(),owner_id:currentUser.id})
+    });
+    const data = await res.json();
+    alert(`✅ Сервер "${data.name}" создан!\n🔑 Код приглашения: ${data.invite_code}\nПоделись кодом с друзьями!`);
+    loadServers();
+  } catch(e) { alert('❌ Ошибка создания сервера'); }
 }
 
 async function searchServers(query) {
   const container = document.getElementById('server-search-results');
-  if (!query || query.length < 2) { container.innerHTML = ''; return; }
-  const res = await fetch(`/servers/search/${encodeURIComponent(query)}`);
+  if (!query || query.trim().length < 2) { container.innerHTML = ''; return; }
+  const res = await fetch(`/servers/search/${encodeURIComponent(query.trim())}`);
   const servers = await res.json();
-  container.innerHTML = servers.map(s => `
-    <div class="item" onclick="joinServerById(${s.id})" style="font-size:12px;"># ${s.name} <span style="color:var(--text-muted);">(${s.invite_code})</span></div>
-  `).join('');
+  container.innerHTML = servers.length === 0 
+    ? '<div style="color:var(--text-muted);font-size:12px;padding:8px;">Ничего не найдено</div>'
+    : servers.map(s => `
+      <div class="item" onclick="joinServerById(${s.id})" style="font-size:13px;">
+        <span class="item-icon">#</span> ${s.name}
+        <span style="color:var(--text-muted);font-size:10px;margin-left:8px;">код: ${s.invite_code}</span>
+      </div>
+    `).join('');
 }
 
 async function joinServerById(serverId) {
-  await fetch('/servers/join', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ invite_code: '', user_id: currentUser.id })
-  });
-  loadServers();
-  document.getElementById('server-search-results').innerHTML = '';
+  try {
+    await fetch('/servers/join', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({invite_code:'',user_id:currentUser.id})
+    });
+    loadServers();
+    document.getElementById('server-search-results').innerHTML = '';
+  } catch(e) { alert('❌ Ошибка присоединения'); }
 }
 
 async function joinServerByInvite() {
   const code = document.getElementById('invite-code').value.trim().toUpperCase();
-  if (!code) return alert('Введите код приглашения');
-  const res = await fetch('/servers/join', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ invite_code: code, user_id: currentUser.id })
-  });
-  if (res.ok) { alert('✅ Присоединился!'); loadServers(); document.getElementById('invite-code').value = ''; }
-  else alert('❌ Неверный код');
+  if (!code) return alert('❌ Введи код приглашения');
+  try {
+    const res = await fetch('/servers/join', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({invite_code:code,user_id:currentUser.id})
+    });
+    if (res.ok) {
+      alert('✅ Ты присоединился к серверу!');
+      loadServers();
+      document.getElementById('invite-code').value = '';
+    } else {
+      const err = await res.json();
+      alert('❌ ' + (err.error || 'Неверный код'));
+    }
+  } catch(e) { alert('❌ Ошибка подключения'); }
 }
 
 async function selectServer(serverId) {
   isPrivateChat = false;
   privateChatFriendId = null;
   privateChatFriendName = null;
-  
   currentServer = serverId;
   socket.emit('join-server', serverId);
-  const res = await fetch(`/channels/${serverId}`);
-  const channels = await res.json();
-  const container = document.getElementById('servers-list');
-  const channelDiv = document.createElement('div');
-  channelDiv.id = 'channels-list';
   
-  let html = '';
-  channels.forEach(c => {
-    if (c.is_voice === 1) {
-      html += `<div class="voice-channel-item" onclick="toggleVoiceChannel(${c.id})" id="voice-channel-${c.id}">
-        <span>🎤 ${c.name}</span>
-        <span class="voice-users" id="voice-users-${c.id}">
-          <span style="color:var(--text-muted);font-size:10px;">0 в канале</span>
-        </span>
-      </div>`;
-    } else {
-      html += `<div class="item" onclick="selectChannel(${c.id})"># ${c.name}</div>`;
-    }
-  });
-  
-  const createBtn = document.createElement('div');
-  createBtn.className = 'item';
-  createBtn.innerHTML = '➕ Создать канал';
-  createBtn.style.color = 'var(--text-muted)';
-  createBtn.onclick = () => createChannel(serverId);
-  
-  channelDiv.innerHTML = html;
-  channelDiv.appendChild(createBtn);
-  
-  const old = document.getElementById('channels-list');
-  if (old) old.remove();
-  container.after(channelDiv);
-  
-  const textChannels = channels.filter(c => c.is_voice === 0);
-  if (textChannels.length) selectChannel(textChannels[0].id);
+  try {
+    const res = await fetch(`/channels/${serverId}`);
+    const channels = await res.json();
+    
+    const oldChannels = document.getElementById('channels-list');
+    if (oldChannels) oldChannels.remove();
+    
+    const channelDiv = document.createElement('div');
+    channelDiv.id = 'channels-list';
+    
+    let html = '';
+    channels.forEach(c => {
+      if (c.is_voice === 1) {
+        html += `<div class="voice-channel-item" onclick="toggleVoiceChannel(${c.id})" id="voice-channel-${c.id}">
+          <span class="voice-info">🔊 ${c.name}</span>
+          <span class="voice-count" id="voice-count-${c.id}">0</span>
+        </div>`;
+      } else {
+        html += `<div class="item" onclick="selectChannel(${c.id})">
+          <span class="item-icon">#</span> ${c.name}
+        </div>`;
+      }
+    });
+    html += `<div class="item" onclick="createChannel(${serverId})" style="color:var(--text-muted);font-size:13px;">
+      <span class="item-icon">➕</span> Создать канал
+    </div>`;
+    
+    channelDiv.innerHTML = html;
+    document.getElementById('servers-list').after(channelDiv);
+    
+    const textChannels = channels.filter(c => c.is_voice === 0);
+    if (textChannels.length) selectChannel(textChannels[0].id);
+  } catch(e) { console.error('Select server error:', e); }
 }
 
 async function createChannel(serverId) {
   const name = prompt('📝 Название канала:');
-  if (!name) return;
-  const isVoice = confirm('Сделать голосовым? (OK - да, Отмена - текстовый)');
-  await fetch('/channels', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, server_id: serverId, is_public: 1, is_voice: isVoice ? 1 : 0 })
-  });
-  selectServer(serverId);
+  if (!name || name.trim().length < 2) return;
+  const isVoice = confirm('Сделать голосовым?\nOK - Голосовой канал\nОтмена - Текстовый канал');
+  try {
+    await fetch('/channels', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:name.trim(),server_id:serverId,is_public:1,is_voice:isVoice?1:0})
+    });
+    selectServer(serverId);
+  } catch(e) { alert('❌ Ошибка создания канала'); }
 }
 
 async function selectChannel(channelId) {
   currentChannel = channelId;
   socket.emit('join-channel', channelId);
-  document.getElementById('chat-title').innerHTML = `# канал ${channelId}`;
-  const res = await fetch(`/messages/${channelId}`);
-  const messages = await res.json();
-  document.getElementById('messages').innerHTML = '';
-  messages.forEach(addMessage);
+  document.getElementById('chat-title').innerHTML = '<span class="channel-icon">#</span> Канал ' + channelId;
+  
+  try {
+    const res = await fetch(`/messages/${channelId}`);
+    const messages = await res.json();
+    const container = document.getElementById('messages');
+    container.innerHTML = messages.length === 0
+      ? '<div style="text-align:center;color:var(--text-muted);padding:40px;">Нет сообщений. Напиши первым! 💬</div>'
+      : '';
+    messages.forEach(addMessage);
+  } catch(e) { console.error('Load messages error:', e); }
 }
 
 // ============================================================
@@ -641,12 +1088,11 @@ async function toggleVoiceChannel(channelId) {
     leaveVoiceChannel();
     return;
   }
-  
   if (inVoiceChannel) {
     leaveVoiceChannel();
     setTimeout(() => joinVoiceChannel(channelId), 500);
   } else {
-    joinVoiceChannel(channelId);
+    await joinVoiceChannel(channelId);
   }
 }
 
@@ -655,94 +1101,125 @@ async function joinVoiceChannel(channelId) {
   inVoiceChannel = true;
   
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStream = await navigator.mediaDevices.getUserMedia({ 
+      audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } 
+    });
     
     socket.emit('voice-join', {
       channelId,
-      serverId: currentServer,
-      userId: currentUser.id,
-      username: currentUser.username
+      serverId:currentServer,
+      userId:currentUser.id,
+      username:currentUser.username
     });
     
     document.getElementById('voice-controls').innerHTML = `
-      <span style="color:var(--green);font-size:12px;">🟢 В голосовом</span>
-      <button class="btn-voice active" onclick="leaveVoiceChannel()" style="background:var(--red);color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;">⏹ Выйти</button>
+      <span style="color:var(--green);font-size:13px;display:flex;align-items:center;gap:6px;">
+        🟢 В голосовом
+        <span class="voice-indicator silent" id="voice-self-indicator"></span>
+      </span>
+      <button id="voice-mute-btn" onclick="toggleVoiceMute()" 
+        style="background:var(--bg-hover);color:var(--text-primary);border:2px solid var(--border);padding:6px 16px;border-radius:10px;cursor:pointer;font-weight:600;font-size:12px;margin-left:8px;">
+        🎙️ Мьют
+      </button>
+      <button onclick="leaveVoiceChannel()" 
+        style="background:var(--red);color:white;border:none;padding:6px 16px;border-radius:10px;cursor:pointer;font-weight:600;font-size:12px;margin-left:4px;">
+        ⏹ Выйти
+      </button>
     `;
     
-    // Создаём соединения со всеми в канале
-    setTimeout(() => {
-      connectToVoicePeers();
-    }, 1000);
+    // Обновляем индикатор голоса
+    const selfIndicator = document.getElementById('voice-self-indicator');
+    if (selfIndicator && localStream) {
+      updateVoiceIndicator(selfIndicator, localStream);
+    }
     
-  } catch (e) {
-    alert('❌ Нет доступа к микрофону!');
+  } catch(e) {
+    alert('❌ Нет доступа к микрофону! Разреши доступ в настройках браузера.');
     inVoiceChannel = false;
+    currentVoiceChannelId = null;
   }
 }
 
-function connectToVoicePeers() {
-  const roomName = `voice-${currentVoiceChannelId}`;
-  // Получаем список пользователей из сервера
-  fetch(`/channels/${currentServer}`)
-    .then(res => res.json())
-    .then(channels => {
-      const voiceChannel = channels.find(c => c.id === currentVoiceChannelId);
-      if (voiceChannel) {
-        // Запрашиваем список пользователей в канале
-        socket.emit('voice-join', {
-          channelId: currentVoiceChannelId,
-          serverId: currentServer,
-          userId: currentUser.id,
-          username: currentUser.username
-        });
+function toggleVoiceMute() {
+  isMuted = !isMuted;
+  if (localStream) {
+    localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+  }
+  const btn = document.getElementById('voice-mute-btn');
+  if (btn) {
+    btn.textContent = isMuted ? '🔇 Анмьют' : '🎙️ Мьют';
+    btn.style.background = isMuted ? 'var(--red)' : 'var(--bg-hover)';
+    btn.style.color = isMuted ? 'white' : 'var(--text-primary)';
+    btn.style.borderColor = isMuted ? 'var(--red)' : 'var(--border)';
+  }
+  const indicator = document.getElementById('voice-self-indicator');
+  if (indicator) {
+    indicator.classList.toggle('muted', isMuted);
+    if (!isMuted) indicator.classList.add('silent');
+  }
+}
+
+async function handleVoiceOffer(from, offer) {
+  try {
+    const pc = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
+    voicePeerConnections[from] = pc;
+    if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+    pc.ontrack = e => {
+      if (e.streams[0]) {
+        const a = new Audio(); a.srcObject = e.streams[0]; a.autoplay = true; a.volume = 0.8;
+        a.play().catch(()=>{});
       }
-    });
+    };
+    pc.onicecandidate = e => { if(e.candidate) socket.emit('voice-ice',{to:from,candidate:e.candidate}); };
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('voice-answer',{to:from,answer});
+  } catch(e) { console.error('Voice offer error:', e); }
+}
+
+async function handleVoiceAnswer(from, answer) {
+  try {
+    if (voicePeerConnections[from]) {
+      await voicePeerConnections[from].setRemoteDescription(new RTCSessionDescription(answer));
+    }
+  } catch(e) { console.error('Voice answer error:', e); }
+}
+
+async function handleVoiceICE(from, candidate) {
+  try {
+    if (voicePeerConnections[from]) {
+      await voicePeerConnections[from].addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  } catch(e) { console.error('Voice ICE error:', e); }
 }
 
 function updateVoiceUsers(users) {
   if (!currentVoiceChannelId) return;
-  
-  const container = document.getElementById(`voice-users-${currentVoiceChannelId}`);
-  if (!container) return;
-  
-  const userList = users || [];
-  const count = userList.length;
-  
-  let html = `<span style="color:var(--text-muted);font-size:10px;">${count} в канале</span>`;
-  if (count > 0) {
-    html += '<div style="margin-top:4px;">';
-    userList.forEach(u => {
-      const isMe = u.userId === currentUser.id;
-      html += `<span class="user-badge" id="voice-user-${u.userId}">${isMe ? '⭐' : ''} ${u.username}</span>`;
-    });
-    html += '</div>';
+  const count = document.getElementById(`voice-count-${currentVoiceChannelId}`);
+  if (count) {
+    const len = (users || []).length;
+    count.textContent = len;
+    count.className = 'voice-count' + (len > 0 ? ' active' : '');
   }
-  
-  container.innerHTML = html;
 }
 
 function leaveVoiceChannel() {
   if (currentVoiceChannelId) {
-    socket.emit('voice-leave', {
-      channelId: currentVoiceChannelId,
-      userId: currentUser.id
-    });
+    socket.emit('voice-leave', { channelId:currentVoiceChannelId, userId:currentUser.id });
   }
-  
-  // Закрываем все peer соединения
   for (const id in voicePeerConnections) {
     voicePeerConnections[id].close();
     delete voicePeerConnections[id];
   }
-  
-  if (localStream) {
+  stopAudioVisualization();
+  if (localStream && !callInProgress) {
     localStream.getTracks().forEach(t => t.stop());
     localStream = null;
   }
-  
   inVoiceChannel = false;
   currentVoiceChannelId = null;
-  
+  isMuted = false;
   document.getElementById('voice-controls').innerHTML = '';
 }
 
@@ -751,63 +1228,90 @@ function leaveVoiceChannel() {
 // ============================================================
 async function searchUsers() {
   const q = document.getElementById('search-user').value.trim();
-  if (!q || q.length < 2) { document.getElementById('search-results').innerHTML = ''; return; }
-  const res = await fetch(`/users/search?q=${q}`);
-  const users = await res.json();
-  document.getElementById('search-results').innerHTML = users.map(u => `
-    <div class="search-result">
-      <span>${u.username}</span>
-      <button class="add-btn" onclick="addFriend(${u.id})">➕</button>
-    </div>
-  `).join('');
+  const container = document.getElementById('search-results');
+  if (!q || q.length < 2) { container.innerHTML = ''; return; }
+  try {
+    const res = await fetch(`/users/search?q=${encodeURIComponent(q)}`);
+    const users = await res.json();
+    container.innerHTML = users.length === 0
+      ? '<div style="color:var(--text-muted);font-size:12px;padding:8px;">Пользователи не найдены</div>'
+      : users.map(u => {
+          const isOnline = u.is_online === 1;
+          return `<div class="search-result">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="status-dot ${isOnline?'online':'offline'}"></span>
+              <span>${u.username}</span>
+              ${!isOnline ? `<span class="last-seen">${formatLastSeen(u.last_seen)}</span>` : '<span style="color:var(--green);font-size:10px;">в сети</span>'}
+            </div>
+            <button class="add-btn" onclick="addFriend(${u.id})">➕</button>
+          </div>`;
+        }).join('');
+  } catch(e) { console.error('Search error:', e); }
 }
 
 async function addFriend(userId) {
-  const res = await fetch('/friends/request', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: currentUser.id, friendId: userId })
-  });
-  if (res.ok) alert('✅ Заявка отправлена!');
-  else alert('❌ Ошибка');
+  try {
+    const res = await fetch('/friends/request', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:currentUser.id,friendId:userId})
+    });
+    if (res.ok) alert('✅ Заявка в друзья отправлена!');
+    else { const err = await res.json(); alert('❌ ' + (err.error || 'Ошибка')); }
+  } catch(e) { alert('❌ Ошибка отправки заявки'); }
 }
 
 async function loadFriends() {
-  const res = await fetch(`/friends/${currentUser.id}`);
-  const friends = await res.json();
-  const container = document.getElementById('friends-list');
-  container.innerHTML = friends.map(f => `
-    <div class="friend-item">
-      <span>${f.username}</span>
-      <div class="friend-actions">
-        <button class="btn-chat" onclick="openPrivateChat(${f.id}, '${f.username}')">💬</button>
-        <button class="btn-call" onclick="callFriendByName('${f.username}')">📞</button>
-      </div>
-    </div>
-  `).join('');
+  try {
+    const res = await fetch(`/friends/${currentUser.id}`);
+    const friends = await res.json();
+    const container = document.getElementById('friends-list');
+    
+    container.innerHTML = friends.length === 0
+      ? '<div style="color:var(--text-muted);font-size:12px;padding:8px;">Нет друзей. Найди людей через поиск!</div>'
+      : friends.map(f => {
+          const isOnline = f.is_online === 1;
+          return `<div class="friend-item">
+            <div class="friend-info">
+              <div class="friend-avatar">${f.username.charAt(0).toUpperCase()}</div>
+              <span class="friend-name">${f.username}</span>
+              <span class="friend-status ${isOnline?'online':'offline'}">${isOnline?'🟢 В сети':'⚫ Не в сети'}</span>
+              ${!isOnline && f.last_seen ? `<span class="last-seen">${formatLastSeen(f.last_seen)}</span>` : ''}
+            </div>
+            <div class="friend-actions">
+              <button class="btn-chat" onclick="openPrivateChat(${f.id},'${f.username}')" title="Чат">💬</button>
+              ${isOnline ? `<button class="btn-call" onclick="callFriendByName('${f.username}')" title="Позвонить">📞</button>` : ''}
+            </div>
+          </div>`;
+        }).join('');
 
-  const reqRes = await fetch(`/friends/requests/${currentUser.id}`);
-  const requests = await reqRes.json();
-  if (requests.length > 0) {
-    container.innerHTML += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;font-size:12px;color:var(--text-secondary);">📩 ЗАЯВКИ</div>';
-    requests.forEach(r => {
-      container.innerHTML += `
-        <div class="friend-item">
-          <span>${r.username}</span>
-          <button onclick="acceptFriend(${r.id})" style="padding:2px 12px;border:none;border-radius:6px;background:var(--green);color:#0f0f1a;cursor:pointer;font-weight:700;">✅</button>
-        </div>
-      `;
-    });
-  }
+    // Заявки в друзья
+    const reqRes = await fetch(`/friends/requests/${currentUser.id}`);
+    const requests = await reqRes.json();
+    if (requests.length > 0) {
+      container.innerHTML += '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;font-size:12px;color:var(--yellow);font-weight:700;">📩 ВХОДЯЩИЕ ЗАЯВКИ (' + requests.length + ')</div>';
+      requests.forEach(r => {
+        container.innerHTML += `<div class="friend-item">
+          <div class="friend-info">
+            <div class="friend-avatar">${r.username.charAt(0).toUpperCase()}</div>
+            <span>${r.username}</span>
+          </div>
+          <button onclick="acceptFriend(${r.id})" style="padding:4px 16px;border:none;border-radius:8px;background:var(--green);color:#0f0f1a;cursor:pointer;font-weight:700;font-size:11px;">✅ Принять</button>
+        </div>`;
+      });
+    }
+  } catch(e) { console.error('Load friends error:', e); }
 }
 
 async function acceptFriend(userId) {
-  await fetch('/friends/accept', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: currentUser.id, friendId: userId })
-  });
-  loadFriends();
+  try {
+    await fetch('/friends/accept', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:currentUser.id,friendId:userId})
+    });
+    loadFriends();
+  } catch(e) { alert('❌ Ошибка'); }
 }
 
 function callFriendByName(username) {
@@ -818,7 +1322,7 @@ function callFriendByName(username) {
       return;
     }
   }
-  alert(`${username} не в сети`);
+  alert(`❌ ${username} сейчас не в сети`);
 }
 
 // ============================================================
@@ -830,21 +1334,28 @@ async function openPrivateChat(friendId, friendName) {
   privateChatFriendName = friendName;
   
   document.getElementById('chat-title').innerHTML = `💬 ${friendName} <span class="private-badge">🔒 Личный чат</span>`;
-  document.getElementById('messages').innerHTML = '';
   
-  const res = await fetch(`/private/messages/${currentUser.id}/${friendId}`);
-  const messages = await res.json();
-  messages.forEach(msg => addPrivateMessage(msg));
+  try {
+    const res = await fetch(`/private/messages/${currentUser.id}/${friendId}`);
+    const messages = await res.json();
+    const container = document.getElementById('messages');
+    container.innerHTML = messages.length === 0
+      ? '<div style="text-align:center;color:var(--text-muted);padding:40px;">Начните личную переписку! 💬</div>'
+      : '';
+    messages.forEach(addPrivateMessage);
+  } catch(e) { console.error('Load private messages error:', e); }
 }
 
 function addPrivateMessage(msg) {
   const container = document.getElementById('messages');
+  if (container.querySelector('div[style*="text-align:center"]')) {
+    container.innerHTML = '';
+  }
   const div = document.createElement('div');
-  div.className = 'message';
-  const isMine = msg.from_user === currentUser.id;
-  if (isMine) div.classList.add('own');
+  div.className = 'message' + (msg.from_user === currentUser.id ? ' own' : '');
   div.innerHTML = `
-    <span class="msg-user">${isMine ? 'Ты' : privateChatFriendName}</span>
+    <span class="msg-user">${msg.from_user === currentUser.id ? 'Вы' : (privateChatFriendName || 'Пользователь')}</span>
+    <span class="msg-time">${formatTime(msg.timestamp)}</span>
     <div class="msg-text">${msg.content}</div>
   `;
   container.appendChild(div);
@@ -853,12 +1364,14 @@ function addPrivateMessage(msg) {
 
 function addMessage(msg) {
   const container = document.getElementById('messages');
+  if (container.querySelector('div[style*="text-align:center"]')) {
+    container.innerHTML = '';
+  }
   const div = document.createElement('div');
-  div.className = 'message';
-  const isMine = msg.user_id === currentUser.id;
-  if (isMine) div.classList.add('own');
+  div.className = 'message' + (msg.user_id === currentUser.id ? ' own' : '');
   div.innerHTML = `
     <span class="msg-user">${msg.username}</span>
+    <span class="msg-time">${formatTime(msg.timestamp)}</span>
     <div class="msg-text">${msg.content}</div>
   `;
   container.appendChild(div);
@@ -870,129 +1383,229 @@ function sendMessage() {
   const content = input.value.trim();
   if (!content) return;
   
+  stopTyping();
+  hideTyping();
+  
   if (isPrivateChat && privateChatFriendId) {
-    const users = document.querySelectorAll('#users-list .online-user');
     let targetSocketId = null;
-    for (let el of users) {
-      if (parseInt(el.dataset.userid) === privateChatFriendId) {
-        targetSocketId = el.dataset.socketid;
-        break;
-      }
-    }
-    
-    socket.emit('private-message', {
-      from_user: currentUser.id,
-      to_user: privateChatFriendId,
-      content,
-      to_socket_id: targetSocketId
+    document.querySelectorAll('#users-list .online-user').forEach(el => {
+      if (parseInt(el.dataset.userid) === privateChatFriendId) targetSocketId = el.dataset.socketid;
     });
-    
-    addPrivateMessage({ from_user: currentUser.id, content, timestamp: new Date().toISOString() });
-    input.value = '';
-    return;
+    socket.emit('private-message', {
+      from_user:currentUser.id,
+      to_user:privateChatFriendId,
+      content,
+      to_socket_id:targetSocketId
+    });
+    addPrivateMessage({from_user:currentUser.id,content,timestamp:new Date().toISOString()});
+  } else if (currentChannel) {
+    socket.emit('message', {channelId:currentChannel,userId:currentUser.id,content});
   }
   
-  if (!currentChannel) return;
-  socket.emit('message', { channelId: currentChannel, userId: currentUser.id, content });
   input.value = '';
+  input.focus();
 }
 
 // ============================================================
-//  ЛИЧНЫЕ ЗВОНКИ (НОВАЯ ПРОВЕРЕННАЯ СХЕМА)
+//  ИНДИКАТОР ПЕЧАТАЕТ
+// ============================================================
+function handleTyping() {
+  const input = document.getElementById('message-input');
+  if (input.value.trim() === '') {
+    stopTyping();
+    return;
+  }
+  
+  if (typingTimeout) clearTimeout(typingTimeout);
+  
+  if (isPrivateChat && privateChatFriendId) {
+    let targetSocketId = null;
+    document.querySelectorAll('#users-list .online-user').forEach(el => {
+      if (parseInt(el.dataset.userid) === privateChatFriendId) targetSocketId = el.dataset.socketid;
+    });
+    socket.emit('private-typing-start', {to_socket_id:targetSocketId,username:currentUser.username});
+  } else if (currentChannel) {
+    socket.emit('typing-start', {channelId:currentChannel,username:currentUser.username});
+  }
+  
+  typingTimeout = setTimeout(stopTyping, 3000);
+}
+
+function stopTyping() {
+  if (typingTimeout) clearTimeout(typingTimeout);
+  typingTimeout = null;
+  
+  if (isPrivateChat && privateChatFriendId) {
+    let targetSocketId = null;
+    document.querySelectorAll('#users-list .online-user').forEach(el => {
+      if (parseInt(el.dataset.userid) === privateChatFriendId) targetSocketId = el.dataset.socketid;
+    });
+    socket.emit('private-typing-stop', {to_socket_id:targetSocketId});
+  } else if (currentChannel) {
+    socket.emit('typing-stop', {channelId:currentChannel});
+  }
+}
+
+function showTyping(username) {
+  const indicator = document.getElementById('typing-indicator');
+  document.getElementById('typing-username').textContent = username || 'Кто-то';
+  indicator.classList.add('active');
+}
+
+function hideTyping() {
+  document.getElementById('typing-indicator').classList.remove('active');
+}
+
+// ============================================================
+//  ЛИЧНЫЕ ЗВОНКИ
 // ============================================================
 async function startCall(socketId, username) {
-  if (callInProgress) { alert('Уже в звонке!'); return; }
-  if (socketId === socket.id) { alert('Это ты!'); return; }
+  if (callInProgress) { alert('⚠️ У вас уже активный звонок!'); return; }
+  if (socketId === socket.id) { alert('🤔 Нельзя позвонить самому себе'); return; }
 
+  console.log('📞 Звоним:', username);
   currentCallerId = socketId;
   currentCallerUsername = username;
 
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    const pc = new RTCPeerConnection(config);
-    peerConnections[socketId] = pc;
-
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream);
+    localStream = await navigator.mediaDevices.getUserMedia({ 
+      audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } 
     });
-
-    pc.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        const audio = new Audio();
-        audio.srcObject = event.streams[0];
-        audio.autoplay = true;
-        audio.volume = 1.0;
-        audio.play().catch(e => console.log('Audio error:', e));
-      }
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit('call-ice', { to: socketId, candidate: event.candidate });
-      }
-    };
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    socket.emit('call-offer', { to: socketId, offer });
-    socket.emit('call-user', { to: socketId, fromUsername: currentUser.username });
-
     callInProgress = true;
+    socket.emit('call-user', { to:socketId, fromUsername:currentUser.username });
     showCallWindow('outgoing');
-  } catch (e) {
-    alert('❌ Нет доступа к микрофону!');
+  } catch(e) {
+    console.error('Call error:', e);
+    alert('❌ Ошибка доступа к микрофону! Разреши доступ в настройках.');
     endCall();
   }
 }
 
-async function acceptCall() {
-  if (!currentCallerId) return;
-  if (callInProgress) return;
-
-  stopRingtone();
-
+async function createOffer() {
+  console.log('📤 Создаю WebRTC offer');
   try {
-    if (!localStream) {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-
-    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    const pc = new RTCPeerConnection(config);
-    peerConnections[currentCallerId] = pc;
-
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream);
+    if (peerConnection) peerConnection.close();
+    
+    peerConnection = new RTCPeerConnection({ 
+      iceServers:[
+        {urls:'stun:stun.l.google.com:19302'},
+        {urls:'stun:stun1.l.google.com:19302'}
+      ] 
     });
-
-    pc.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        const audio = new Audio();
-        audio.srcObject = event.streams[0];
-        audio.autoplay = true;
-        audio.volume = 1.0;
-        audio.play().catch(e => console.log('Audio error:', e));
+    
+    if (localStream) {
+      localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+    }
+    
+    peerConnection.ontrack = (event) => {
+      console.log('🎵 Получен удалённый аудиопоток');
+      if (event.streams[0]) {
+        if (remoteAudioElement) { remoteAudioElement.srcObject = null; remoteAudioElement.remove(); }
+        remoteAudioElement = new Audio();
+        remoteAudioElement.srcObject = event.streams[0];
+        remoteAudioElement.autoplay = true;
+        remoteAudioElement.volume = document.getElementById('remote-volume').value / 100;
+        remoteAudioElement.play().catch(e => console.error('Play error:', e));
+        
+        const indicator = document.getElementById('call-voice-indicator');
+        updateVoiceIndicator(indicator, event.streams[0]);
+        startAudioVisualization(event.streams[0]);
       }
     };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit('call-ice', { to: currentCallerId, candidate: event.candidate });
-      }
+    
+    peerConnection.onicecandidate = (e) => {
+      if (e.candidate) socket.emit('call-ice',{to:currentCallerId,candidate:e.candidate});
     };
-
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-
-    socket.emit('call-answer', { to: currentCallerId, answer });
-    socket.emit('call-accept', { to: currentCallerId });
-
+    
+    peerConnection.onconnectionstatechange = () => {
+      console.log('📡 Состояние:', peerConnection.connectionState);
+    };
+    
+    const offer = await peerConnection.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:false});
+    await peerConnection.setLocalDescription(offer);
+    socket.emit('call-offer',{to:currentCallerId,offer});
+    
     callInProgress = true;
     startTimer();
     showCallWindow('active');
-  } catch (e) {
+  } catch(e) { console.error('Offer error:', e); }
+}
+
+async function handleOffer(from, offer) {
+  console.log('📨 Обработка offer');
+  try {
+    if (peerConnection) peerConnection.close();
+    
+    peerConnection = new RTCPeerConnection({ 
+      iceServers:[{urls:'stun:stun.l.google.com:19302'}] 
+    });
+    
+    if (localStream) {
+      localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+    }
+    
+    peerConnection.ontrack = (event) => {
+      console.log('🎵 Получен аудиопоток');
+      if (event.streams[0]) {
+        if (remoteAudioElement) { remoteAudioElement.srcObject = null; remoteAudioElement.remove(); }
+        remoteAudioElement = new Audio();
+        remoteAudioElement.srcObject = event.streams[0];
+        remoteAudioElement.autoplay = true;
+        remoteAudioElement.volume = document.getElementById('remote-volume').value / 100;
+        remoteAudioElement.play().catch(e => console.error('Play error:', e));
+        
+        const indicator = document.getElementById('call-voice-indicator');
+        updateVoiceIndicator(indicator, event.streams[0]);
+      }
+    };
+    
+    peerConnection.onicecandidate = (e) => {
+      if (e.candidate) socket.emit('call-ice',{to:from,candidate:e.candidate});
+    };
+    
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit('call-answer',{to:from,answer});
+    
+    callInProgress = true;
+    startTimer();
+    showCallWindow('active');
+  } catch(e) { console.error('Handle offer error:', e); }
+}
+
+async function handleAnswer(from, answer) {
+  try {
+    if (peerConnection) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+      console.log('✅ Answer установлен');
+    }
+  } catch(e) { console.error('Answer error:', e); }
+}
+
+async function handleICE(from, candidate) {
+  try {
+    if (peerConnection) await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+  } catch(e) { console.error('ICE error:', e); }
+}
+
+async function acceptCall() {
+  console.log('📞 Принимаем звонок');
+  if (!currentCallerId) return;
+  
+  stopRingtone();
+  playConnectSound();
+  
+  try {
+    if (!localStream) {
+      localStream = await navigator.mediaDevices.getUserMedia({ 
+        audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } 
+      });
+    }
+    socket.emit('call-accept',{to:currentCallerId});
+    createOffer();
+  } catch(e) {
+    console.error('Accept error:', e);
     alert('❌ Ошибка: ' + e.message);
     endCall();
   }
@@ -1000,102 +1613,92 @@ async function acceptCall() {
 
 function rejectCall() {
   stopRingtone();
-  if (currentCallerId) {
-    socket.emit('call-reject', { to: currentCallerId });
-  }
+  playDisconnectSound();
+  if (currentCallerId) socket.emit('call-reject',{to:currentCallerId});
   endCall();
 }
 
 function cancelCall() {
-  if (currentCallerId) {
-    socket.emit('call-end', { to: currentCallerId });
-  }
+  if (currentCallerId) socket.emit('call-end',{to:currentCallerId});
   endCall();
 }
 
 function endCall() {
+  console.log('📴 Завершение звонка');
   stopRingtone();
+  stopAudioVisualization();
   
-  for (const id in peerConnections) {
-    peerConnections[id].close();
-    delete peerConnections[id];
-  }
-  
-  if (localStream && !inVoiceChannel) {
-    localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-  }
-  
-  if (callTimerInterval) {
-    clearInterval(callTimerInterval);
-    callTimerInterval = null;
-  }
+  if (peerConnection) { peerConnection.close(); peerConnection = null; }
+  if (remoteAudioElement) { remoteAudioElement.srcObject = null; remoteAudioElement.remove(); remoteAudioElement = null; }
+  if (localStream && !inVoiceChannel) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
   
   callInProgress = false;
   callSeconds = 0;
+  isMuted = false;
+  
   document.getElementById('call-overlay').classList.remove('active');
   currentCallerId = null;
 }
 
-function toggleMute() {
+function toggleCallMute() {
   isMuted = !isMuted;
-  if (localStream) {
-    localStream.getAudioTracks().forEach(track => {
-      track.enabled = !isMuted;
-    });
+  if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+  
+  const btn = document.querySelector('#call-window .btn-mute');
+  if (btn) {
+    btn.textContent = isMuted ? '🔇 Вкл. микрофон' : '🎙️ Выкл. микрофон';
+    btn.classList.toggle('muted', isMuted);
   }
-  const muteBtn = document.querySelector('.btn-mute');
-  if (muteBtn) {
-    muteBtn.textContent = isMuted ? '🔇 Без звука' : '🎙️ Вкл. звук';
-  }
+}
+
+function setRemoteVolume(value) {
+  if (remoteAudioElement) remoteAudioElement.volume = value / 100;
 }
 
 function startTimer() {
   callSeconds = 0;
   if (callTimerInterval) clearInterval(callTimerInterval);
+  document.getElementById('call-timer').textContent = '00:00';
+  
   callTimerInterval = setInterval(() => {
     callSeconds++;
-    const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
-    const secs = String(callSeconds % 60).padStart(2, '0');
-    document.getElementById('call-timer').textContent = `${mins}:${secs}`;
+    const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+    const s = String(callSeconds % 60).padStart(2, '0');
+    document.getElementById('call-timer').textContent = `${m}:${s}`;
   }, 1000);
 }
 
-// ============================================================
-//  UI ЗВОНКА
-// ============================================================
 function showCallWindow(type) {
   const overlay = document.getElementById('call-overlay');
-  const nameEl = document.getElementById('caller-name');
-  const statusEl = document.getElementById('call-status');
-  const avatarEl = document.getElementById('caller-avatar');
-  const buttonsEl = document.getElementById('call-buttons');
-  const timerEl = document.getElementById('call-timer');
-
   overlay.classList.add('active');
-
-  if (currentCallerUsername) {
-    nameEl.textContent = currentCallerUsername;
-    avatarEl.textContent = currentCallerUsername.charAt(0).toUpperCase();
-  }
-
+  
+  document.getElementById('caller-name').innerHTML = 
+    (currentCallerUsername || 'Неизвестный') + 
+    ' <span class="voice-indicator silent" id="call-voice-indicator"></span>';
+  document.getElementById('caller-avatar').textContent = (currentCallerUsername || '?')[0].toUpperCase();
+  
+  const status = document.getElementById('call-status');
+  const timer = document.getElementById('call-timer');
+  const buttons = document.getElementById('call-buttons');
+  
   if (type === 'incoming') {
-    statusEl.textContent = '📞 Входящий звонок...';
-    timerEl.textContent = '00:00';
-    buttonsEl.innerHTML = `
+    status.innerHTML = '<span class="call-status-indicator"><span class="dot ringing"></span> Входящий звонок...</span>';
+    timer.textContent = '00:00';
+    buttons.innerHTML = `
       <button class="btn-accept ringing" onclick="acceptCall()">📞 Принять</button>
       <button class="btn-reject" onclick="rejectCall()">❌ Отклонить</button>
     `;
   } else if (type === 'outgoing') {
-    statusEl.textContent = '📤 Исходящий звонок...';
-    timerEl.textContent = '00:00';
-    buttonsEl.innerHTML = `
+    status.innerHTML = '<span class="call-status-indicator"><span class="dot ringing"></span> Звоним...</span>';
+    timer.textContent = '00:00';
+    buttons.innerHTML = `
       <button class="btn-cancel" onclick="cancelCall()">❌ Отменить</button>
     `;
   } else if (type === 'active') {
-    statusEl.textContent = '🟢 В разговоре';
-    buttonsEl.innerHTML = `
-      <button class="btn-mute" onclick="toggleMute()">🎙️ Вкл. звук</button>
+    status.innerHTML = '<span class="call-status-indicator"><span class="dot connected"></span> Разговор</span>';
+    buttons.innerHTML = `
+      <button class="btn-mute" onclick="toggleCallMute()">🎙️ Выкл. микрофон</button>
       <button class="btn-end" onclick="endCall()">📴 Завершить</button>
     `;
   }
@@ -1107,11 +1710,35 @@ function showCallWindow(type) {
 loadSavedLogin();
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && document.activeElement.id === 'message-input') {
+  if (e.key === 'Enter' && document.activeElement.id === 'message-input' && !e.shiftKey) {
     e.preventDefault();
     sendMessage();
   }
 });
+
+// Закрытие эмодзи при клике вне
+document.addEventListener('click', (e) => {
+  const picker = document.getElementById('emoji-picker');
+  const emojiBtn = document.querySelector('.emoji-btn');
+  if (picker && !picker.contains(e.target) && emojiBtn && !emojiBtn.contains(e.target)) {
+    picker.classList.remove('show');
+  }
+});
+
+window.addEventListener('beforeunload', () => {
+  if (inVoiceChannel) leaveVoiceChannel();
+  if (callInProgress) endCall();
+  if (socket) socket.emit('logout');
+});
+
+console.log('🚀 Discord Clone загружен!');
+console.log('💡 Возможности:');
+console.log('  - 📞 Звонки с индикатором голоса');
+console.log('  - 😀 Панель эмодзи');
+console.log('  - ⌨️ Индикатор "печатает"');
+console.log('  - 🎤 Голосовые каналы');
+console.log('  - 🔊 Регулятор громкости');
+console.log('  - 🎵 3 разные мелодии звонка');
 </script>
 </body>
 </html>
