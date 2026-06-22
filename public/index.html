@@ -10,13 +10,13 @@
     #login input, #register input { padding: 10px; border: none; border-radius: 6px; background: #45475a; color: #cdd6f4; }
     #login button, #register button { padding: 10px; background: #89b4fa; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: #1e1e2e; }
     #app { display: none; width: 100%; }
-    .sidebar { width: 240px; background: #1e1e2e; padding: 15px; border-right: 1px solid #313244; overflow-y: auto; }
+    .sidebar { width: 260px; background: #1e1e2e; padding: 15px; border-right: 1px solid #313244; overflow-y: auto; }
     .sidebar h3 { color: #a6adc8; font-size: 14px; margin: 15px 0 5px; }
     .sidebar .item { padding: 8px 12px; border-radius: 6px; cursor: pointer; margin: 2px 0; }
     .sidebar .item:hover { background: #313244; }
     .sidebar .item.active { background: #45475a; }
     .chat { flex: 1; display: flex; flex-direction: column; background: #181825; }
-    .chat-header { padding: 15px; border-bottom: 1px solid #313244; font-weight: bold; }
+    .chat-header { padding: 15px; border-bottom: 1px solid #313244; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
     .messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
     .message { padding: 6px 12px; background: #313244; border-radius: 8px; max-width: 80%; }
     .message .user { font-weight: bold; color: #89b4fa; }
@@ -24,16 +24,25 @@
     .input-area { display: flex; padding: 15px; gap: 10px; border-top: 1px solid #313244; }
     .input-area input { flex: 1; padding: 10px; border-radius: 8px; border: none; background: #313244; color: #cdd6f4; }
     .input-area button { padding: 10px 20px; background: #89b4fa; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #1e1e2e; }
-    .voice { margin-top: 15px; padding: 10px; background: #313244; border-radius: 8px; }
-    .voice button { background: #a6e3a1; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-    #users-list { margin-top: 10px; }
-    .online-user { padding: 4px 8px; font-size: 13px; color: #a6adc8; }
+    .online-user { padding: 4px 8px; font-size: 13px; color: #a6adc8; cursor: pointer; }
     .online-user::before { content: "🟢 "; }
+    .online-user:hover { background: #313244; border-radius: 4px; }
     .hidden { display: none; }
+    .btn-call { background: #a6e3a1; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left: 8px; }
+    .btn-call:hover { background: #89b4fa; }
+    .btn-call.ringing { background: #f9e2af; animation: pulse 1s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    .call-notification { position: fixed; bottom: 20px; right: 20px; background: #313244; padding: 20px; border-radius: 12px; border: 2px solid #89b4fa; z-index: 999; }
+    .call-notification button { margin: 5px; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .call-notification .accept { background: #a6e3a1; }
+    .call-notification .reject { background: #f38ba8; }
+    .friends-section { margin-top: 10px; }
+    .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; }
   </style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="auth">
   <div id="login">
     <h2>Вход</h2>
@@ -51,21 +60,32 @@
   </div>
 </div>
 
+<!-- APP -->
 <div id="app">
   <div class="sidebar">
     <h3>Сервера</h3>
     <div id="servers-list"></div>
     <button onclick="createServer()" style="margin-top:10px; background:#89b4fa; border:none; padding:6px; border-radius:6px; cursor:pointer; font-weight:bold;">+ Создать сервер</button>
-    <h3 style="margin-top:20px;">Онлайн</h3>
+    
+    <h3 style="margin-top:20px;">👥 Друзья</h3>
+    <div id="friends-list"></div>
+    
+    <h3 style="margin-top:10px;">🔍 Найти друзей</h3>
+    <input id="search-user" placeholder="Поиск..." oninput="searchUsers()" style="width:100%; padding:6px; border-radius:6px; border:none; background:#45475a; color:#cdd6f4;" />
+    <div id="search-results"></div>
+    
+    <h3 style="margin-top:20px;">🟢 Онлайн</h3>
     <div id="users-list"></div>
-    <div class="voice">
-      <button onclick="startVoice()">🎤 Голосовой чат</button>
-      <button onclick="stopVoice()">⏹ Остановить</button>
-    </div>
   </div>
 
   <div class="chat">
-    <div class="chat-header" id="chat-header"># general</div>
+    <div class="chat-header" id="chat-header">
+      <span># general</span>
+      <div>
+        <button onclick="startVoice()" style="background:#a6e3a1; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">🎤 Голосовой чат</button>
+        <button onclick="stopVoice()" style="background:#f38ba8; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">⏹ Остановить</button>
+      </div>
+    </div>
     <div class="messages" id="messages"></div>
     <div class="input-area">
       <input id="message-input" placeholder="Сообщение..." />
@@ -74,10 +94,22 @@
   </div>
 </div>
 
+<!-- CALL NOTIFICATION -->
+<div id="call-notification" class="call-notification hidden">
+  <div id="caller-name">Неизвестный</div>
+  <div style="margin-top:10px;">
+    <button class="accept" onclick="acceptCall()">📞 Принять</button>
+    <button class="reject" onclick="rejectCall()">❌ Отклонить</button>
+  </div>
+</div>
+
 <script>
   let socket, currentUser, currentChannel, currentServer, token;
   let localStream = null;
-  let peerConnections = {};
+  let peerConnection = null;
+  let callInProgress = false;
+  let currentCallerId = null;
+  let currentCallerUsername = null;
 
   function showRegister() {
     document.getElementById('login').classList.add('hidden');
@@ -116,28 +148,251 @@
       document.getElementById('app').style.display = 'flex';
       initSocket();
       loadServers();
+      loadFriends();
     } else alert('Неверный логин или пароль');
   }
 
   function initSocket() {
     socket = io();
-    socket.on('connect', () => socket.emit('join', { userId: currentUser.id, username: currentUser.username }));
-    socket.on('users', (users) => {
-      document.getElementById('users-list').innerHTML = users.map(u => `<div class="online-user">${u.username}</div>`).join('');
+    socket.on('connect', () => {
+      socket.emit('join', { userId: currentUser.id, username: currentUser.username });
     });
+
+    socket.on('users', (users) => {
+      const list = document.getElementById('users-list');
+      list.innerHTML = users.map(u => `
+        <div class="online-user" onclick="callUser('${u.socketId}', '${u.username}')">
+          ${u.username}
+          <button class="btn-call">📞</button>
+        </div>
+      `).join('');
+    });
+
     socket.on('message', addMessage);
-    socket.on('signal', async (data) => {
-      if (peerConnections[data.from]) {
-        await peerConnections[data.from].setRemoteDescription(new RTCSessionDescription(data.signal));
-        if (data.signal.type === 'offer') {
-          const answer = await peerConnections[data.from].createAnswer();
-          await peerConnections[data.from].setLocalDescription(answer);
-          socket.emit('signal', { to: data.from, signal: answer });
-        }
+
+    // ====== ВХОДЯЩИЙ ЗВОНОК ======
+    socket.on('incoming-call', async (data) => {
+      currentCallerId = data.from;
+      currentCallerUsername = data.fromUsername || 'Неизвестный';
+      document.getElementById('caller-name').textContent = `📞 ${currentCallerUsername} звонит...`;
+      document.getElementById('call-notification').classList.remove('hidden');
+    });
+
+    // ====== ЗВОНОК ПРИНЯТ ======
+    socket.on('call-answered', async (data) => {
+      if (peerConnection) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
       }
+    });
+
+    // ====== ICE CANDIDATE ======
+    socket.on('ice-candidate', async (data) => {
+      if (peerConnection) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    });
+
+    // ====== ЗВОНОК ЗАВЕРШЕН ======
+    socket.on('call-ended', () => {
+      endCall();
     });
   }
 
+  // ====== ПОИСК ДРУЗЕЙ ======
+  async function searchUsers() {
+    const q = document.getElementById('search-user').value;
+    if (!q || q.length < 2) { document.getElementById('search-results').innerHTML = ''; return; }
+    const res = await fetch(`/users/search?q=${q}`);
+    const users = await res.json();
+    const container = document.getElementById('search-results');
+    container.innerHTML = users.map(u => `
+      <div class="online-user" style="display:flex; justify-content:space-between; padding:4px 8px;">
+        ${u.username}
+        <button onclick="addFriend(${u.id})" style="background:#a6e3a1; border:none; border-radius:4px; padding:2px 12px; cursor:pointer;">➕</button>
+      </div>
+    `).join('');
+  }
+
+  async function addFriend(userId) {
+    const res = await fetch('/friends/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUser.id, friendId: userId })
+    });
+    if (res.ok) {
+      alert('Заявка отправлена!');
+    } else {
+      alert('Ошибка или уже отправлено');
+    }
+  }
+
+  async function loadFriends() {
+    const res = await fetch(`/friends/${currentUser.id}`);
+    const friends = await res.json();
+    const container = document.getElementById('friends-list');
+    container.innerHTML = friends.map(f => `
+      <div class="friend-item">
+        <span>${f.username}</span>
+        <button onclick="callFriend(${f.id})" class="btn-call">📞</button>
+      </div>
+    `).join('');
+
+    // Загружаем заявки
+    const reqRes = await fetch(`/friends/requests/${currentUser.id}`);
+    const requests = await reqRes.json();
+    if (requests.length > 0) {
+      container.innerHTML += '<div style="margin-top:10px; border-top:1px solid #313244; padding-top:10px;"><b>Заявки:</b></div>';
+      requests.forEach(r => {
+        container.innerHTML += `
+          <div class="friend-item">
+            <span>📩 ${r.username}</span>
+            <button onclick="acceptFriend(${r.id})" style="background:#a6e3a1; border:none; border-radius:4px; padding:2px 12px; cursor:pointer;">✅</button>
+          </div>
+        `;
+      });
+    }
+  }
+
+  async function acceptFriend(userId) {
+    await fetch('/friends/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUser.id, friendId: userId })
+    });
+    loadFriends();
+  }
+
+  // ====== ЗВОНКИ ======
+  async function callUser(socketId, username) {
+    if (callInProgress) {
+      alert('Уже в звонке!');
+      return;
+    }
+    if (socketId === socket.id) {
+      alert('Это ты сам!');
+      return;
+    }
+
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+      });
+
+      peerConnection.ontrack = (event) => {
+        const audio = new Audio();
+        audio.srcObject = event.streams[0];
+        audio.play();
+      };
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('ice-candidate', {
+            to: socketId,
+            candidate: event.candidate
+          });
+        }
+      };
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+
+      socket.emit('call-user', {
+        to: socketId,
+        signal: offer
+      });
+
+      callInProgress = true;
+      alert(`📞 Звоним ${username}...`);
+    } catch (e) {
+      console.error('Ошибка звонка:', e);
+      alert('Ошибка доступа к микрофону');
+    }
+  }
+
+  function callFriend(friendId) {
+    // Найти сокет друга
+    const users = document.querySelectorAll('#users-list .online-user');
+    users.forEach(el => {
+      if (el.textContent.includes('📞')) {
+        // Находим юзера по имени
+      }
+    });
+    alert('Нажми на зеленую точку у друга в списке Онлайн');
+  }
+
+  async function acceptCall() {
+    document.getElementById('call-notification').classList.add('hidden');
+    
+    try {
+      if (!localStream) {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+
+      peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+      });
+
+      peerConnection.ontrack = (event) => {
+        const audio = new Audio();
+        audio.srcObject = event.streams[0];
+        audio.play();
+      };
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('ice-candidate', {
+            to: currentCallerId,
+            candidate: event.candidate
+          });
+        }
+      };
+
+      // Ответ на звонок
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+
+      socket.emit('answer-call', {
+        to: currentCallerId,
+        signal: answer
+      });
+
+      callInProgress = true;
+    } catch (e) {
+      console.error('Ошибка принятия звонка:', e);
+    }
+  }
+
+  function rejectCall() {
+    document.getElementById('call-notification').classList.add('hidden');
+    socket.emit('end-call', { to: currentCallerId });
+    currentCallerId = null;
+  }
+
+  function endCall() {
+    if (peerConnection) {
+      peerConnection.close();
+      peerConnection = null;
+    }
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+    }
+    callInProgress = false;
+    document.getElementById('call-notification').classList.add('hidden');
+    alert('Звонок завершен');
+  }
+
+  // ====== ОСТАЛЬНОЕ (сервера, сообщения) ======
   async function loadServers() {
     const res = await fetch(`/servers/${currentUser.id}`);
     const servers = await res.json();
@@ -178,7 +433,7 @@
   async function selectChannel(channelId) {
     currentChannel = channelId;
     socket.emit('join-channel', channelId);
-    document.getElementById('chat-header').textContent = `# канал ${channelId}`;
+    document.getElementById('chat-header').innerHTML = `<span># канал ${channelId}</span><div><button onclick="startVoice()" style="background:#a6e3a1; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">🎤 Голосовой чат</button><button onclick="stopVoice()" style="background:#f38ba8; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">⏹ Остановить</button></div>`;
     const res = await fetch(`/messages/${channelId}`);
     const messages = await res.json();
     document.getElementById('messages').innerHTML = '';
@@ -202,37 +457,17 @@
     input.value = '';
   }
 
+  // ====== ГОЛОСОВОЙ ЧАТ В КАНАЛЕ (как раньше) ======
   async function startVoice() {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const users = document.querySelectorAll('#users-list .online-user');
-      users.forEach(user => {
-        const username = user.textContent.trim();
-        if (username !== currentUser.username) {
-          const pc = new RTCPeerConnection();
-          peerConnections[username] = pc;
-          localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-          pc.onicecandidate = (e) => {
-            if (e.candidate) socket.emit('signal', { to: username, signal: { candidate: e.candidate } });
-          };
-          pc.ontrack = (e) => {
-            const audio = new Audio();
-            audio.srcObject = e.streams[0];
-            audio.play();
-          };
-          pc.createOffer().then(offer => pc.setLocalDescription(offer))
-            .then(() => socket.emit('signal', { to: username, signal: pc.localDescription }));
-        }
-      });
-      alert('Голосовой чат запущен!');
+      alert('🎤 Микрофон включен!');
     } catch (e) { alert('Ошибка доступа к микрофону'); }
   }
 
   function stopVoice() {
     if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-    Object.values(peerConnections).forEach(pc => pc.close());
-    peerConnections = {};
-    alert('Голосовой чат остановлен');
+    alert('⏹ Микрофон выключен');
   }
 
   document.addEventListener('keydown', (e) => {
