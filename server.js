@@ -38,7 +38,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     server_id INTEGER,
-    is_public INTEGER DEFAULT 1
+    is_public INTEGER DEFAULT 1,
+    is_voice INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -104,7 +105,7 @@ app.post('/login', async (req, res) => {
   res.json({ token, user: { id: user.id, username: user.username } });
 });
 
-// ========== СЕРВЕРА С ИНВАЙТ-КОДАМИ ==========
+// ========== СЕРВЕРА ==========
 app.post('/servers', (req, res) => {
   const { name, owner_id } = req.body;
   try {
@@ -114,7 +115,10 @@ app.post('/servers', (req, res) => {
     const serverId = info.lastInsertRowid;
     
     db.prepare('INSERT INTO members (user_id, server_id) VALUES (?, ?)').run(owner_id, serverId);
-    db.prepare('INSERT INTO channels (name, server_id, is_public) VALUES (?, ?, ?)').run('general', serverId, 1);
+    db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
+      .run('general', serverId, 1, 0);
+    db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
+      .run('Голосовой канал', serverId, 1, 1);
     
     res.json({ id: serverId, name, invite_code: inviteCode });
   } catch (error) {
@@ -174,11 +178,11 @@ app.get('/channels/:serverId', (req, res) => {
 });
 
 app.post('/channels', (req, res) => {
-  const { name, server_id, is_public } = req.body;
+  const { name, server_id, is_public, is_voice } = req.body;
   try {
-    const stmt = db.prepare('INSERT INTO channels (name, server_id, is_public) VALUES (?, ?, ?)');
-    const info = stmt.run(name, server_id, is_public || 1);
-    res.json({ id: info.lastInsertRowid, name, server_id, is_public: is_public || 1 });
+    const stmt = db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)');
+    const info = stmt.run(name, server_id, is_public || 1, is_voice || 0);
+    res.json({ id: info.lastInsertRowid, name, server_id, is_public: is_public || 1, is_voice: is_voice || 0 });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -267,6 +271,7 @@ app.get('/private/messages/:userId/:friendId', (req, res) => {
 
 // ========== SOCKET.IO ==========
 const onlineUsers = {};
+const voiceRooms = {};
 
 io.on('connection', (socket) => {
   console.log('👤 Подключился:', socket.id);
@@ -322,53 +327,89 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ===== ИСПРАВЛЕННЫЙ ВЕБРТК =====
+  // ===== ГОЛОСОВЫЕ КАНАЛЫ =====
+  socket.on('join-voice-channel', ({ channelId, serverId, userId, username }) => {
+    const roomName = `voice-${channelId}`;
+    socket.join(roomName);
+    
+    if (!voiceRooms[roomName]) {
+      voiceRooms[roomName] = [];
+    }
+    if (!voiceRooms[roomName].find(u => u.userId === userId)) {
+      voiceRooms[roomName].push({ userId, username, socketId: socket.id });
+    }
+    
+    io.to(roomName).emit('voice-users', voiceRooms[roomName]);
+  });
+
+  socket.on('leave-voice-channel', ({ channelId, userId }) => {
+    const roomName = `voice-${channelId}`;
+    socket.leave(roomName);
+    
+    if (voiceRooms[roomName]) {
+      voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
+      io.to(roomName).emit('voice-users', voiceRooms[roomName]);
+      if (voiceRooms[roomName].length === 0) {
+        delete voiceRooms[roomName];
+      }
+    }
+  });
+
+  // ===== ВЕБРТК СИГНАЛИНГ =====
+  socket.on('voice-signal', (data) => {
+    const { to, signal } = data;
+    io.to(to).emit('voice-signal', {
+      from: socket.id,
+      signal
+    });
+  });
+
+  // ===== ЛИЧНЫЕ ЗВОНКИ (ПРОСТОЙ И РАБОЧИЙ ВАРИАНТ) =====
   socket.on('call-user', (data) => {
-    const { to, signal, fromUsername } = data;
+    const { to, fromUsername } = data;
     const caller = onlineUsers[socket.id];
     if (caller && onlineUsers[to]) {
       io.to(to).emit('incoming-call', {
         from: socket.id,
         fromUserId: caller.userId,
-        fromUsername: fromUsername || caller.username,
-        signal
+        fromUsername: fromUsername || caller.username
       });
     } else {
       socket.emit('call-failed', { reason: 'Пользователь не в сети' });
     }
   });
 
-  socket.on('answer-call', (data) => {
-    const { to, signal } = data;
-    if (onlineUsers[to]) {
-      io.to(to).emit('call-answered', { signal });
-    }
+  socket.on('call-accepted', (data) => {
+    const { to } = data;
+    io.to(to).emit('call-connected', { from: socket.id });
   });
 
-  socket.on('ice-candidate', (data) => {
-    const { to, candidate } = data;
-    if (onlineUsers[to]) {
-      io.to(to).emit('ice-candidate', { from: socket.id, candidate });
-    }
+  socket.on('call-rejected', (data) => {
+    const { to } = data;
+    io.to(to).emit('call-failed', { reason: 'Пользователь отклонил звонок' });
   });
 
-  socket.on('end-call', (data) => {
+  socket.on('call-end', (data) => {
     const { to } = data;
     if (onlineUsers[to]) {
       io.to(to).emit('call-ended');
     }
   });
 
-  socket.on('voice-activity', (data) => {
-    const { to, isSpeaking } = data;
-    if (onlineUsers[to]) {
-      io.to(to).emit('voice-activity', { from: socket.id, isSpeaking });
-    }
-  });
-
   socket.on('disconnect', () => {
     const user = onlineUsers[socket.id];
-    if (user) console.log(`❌ ${user.username} вышел`);
+    if (user) {
+      console.log(`❌ ${user.username} вышел`);
+      
+      // Удаляем из голосовых комнат
+      for (const roomName in voiceRooms) {
+        voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== user.userId);
+        io.to(roomName).emit('voice-users', voiceRooms[roomName]);
+        if (voiceRooms[roomName].length === 0) {
+          delete voiceRooms[roomName];
+        }
+      }
+    }
     delete onlineUsers[socket.id];
     io.emit('users', Object.values(onlineUsers));
   });
