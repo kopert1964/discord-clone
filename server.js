@@ -327,72 +327,103 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ===== ГОЛОСОВЫЕ КАНАЛЫ =====
-  socket.on('join-voice-channel', ({ channelId, serverId, userId, username }) => {
+  // ===== ГОЛОСОВЫЕ КАНАЛЫ (ПОЛНОСТЬЮ ПЕРЕПИСАНЫ) =====
+  socket.on('voice-join', ({ channelId, serverId, userId, username }) => {
     const roomName = `voice-${channelId}`;
     socket.join(roomName);
     
     if (!voiceRooms[roomName]) {
       voiceRooms[roomName] = [];
     }
-    if (!voiceRooms[roomName].find(u => u.userId === userId)) {
-      voiceRooms[roomName].push({ userId, username, socketId: socket.id });
-    }
     
+    // Удаляем если уже есть
+    voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
+    voiceRooms[roomName].push({ userId, username, socketId: socket.id });
+    
+    // Отправляем всем в комнате обновлённый список
     io.to(roomName).emit('voice-users', voiceRooms[roomName]);
+    
+    console.log(`🎤 ${username} вошёл в голосовой канал ${channelId}`);
   });
 
-  socket.on('leave-voice-channel', ({ channelId, userId }) => {
+  socket.on('voice-leave', ({ channelId, userId }) => {
     const roomName = `voice-${channelId}`;
     socket.leave(roomName);
     
     if (voiceRooms[roomName]) {
       voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
       io.to(roomName).emit('voice-users', voiceRooms[roomName]);
+      
       if (voiceRooms[roomName].length === 0) {
         delete voiceRooms[roomName];
       }
     }
   });
 
-  // ===== ВЕБРТК СИГНАЛИНГ =====
-  socket.on('voice-signal', (data) => {
-    const { to, signal } = data;
-    io.to(to).emit('voice-signal', {
-      from: socket.id,
-      signal
-    });
+  // WebRTC сигналинг для голосовых каналов
+  socket.on('voice-offer', ({ to, offer }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('voice-offer', { from: socket.id, offer });
+    }
   });
 
-  // ===== ЛИЧНЫЕ ЗВОНКИ (ПРОСТОЙ И РАБОЧИЙ ВАРИАНТ) =====
-  socket.on('call-user', (data) => {
-    const { to, fromUsername } = data;
-    const caller = onlineUsers[socket.id];
-    if (caller && onlineUsers[to]) {
+  socket.on('voice-answer', ({ to, answer }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('voice-answer', { from: socket.id, answer });
+    }
+  });
+
+  socket.on('voice-ice', ({ to, candidate }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('voice-ice', { from: socket.id, candidate });
+    }
+  });
+
+  // ===== ЛИЧНЫЕ ЗВОНКИ =====
+  socket.on('call-user', ({ to, fromUsername }) => {
+    if (onlineUsers[to]) {
       io.to(to).emit('incoming-call', {
         from: socket.id,
-        fromUserId: caller.userId,
-        fromUsername: fromUsername || caller.username
+        fromUsername: fromUsername || 'Неизвестный'
       });
     } else {
       socket.emit('call-failed', { reason: 'Пользователь не в сети' });
     }
   });
 
-  socket.on('call-accepted', (data) => {
-    const { to } = data;
-    io.to(to).emit('call-connected', { from: socket.id });
+  socket.on('call-accept', ({ to }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-connected', { from: socket.id });
+    }
   });
 
-  socket.on('call-rejected', (data) => {
-    const { to } = data;
-    io.to(to).emit('call-failed', { reason: 'Пользователь отклонил звонок' });
+  socket.on('call-reject', ({ to }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-failed', { reason: 'Пользователь отклонил звонок' });
+    }
   });
 
-  socket.on('call-end', (data) => {
-    const { to } = data;
+  socket.on('call-end', ({ to }) => {
     if (onlineUsers[to]) {
       io.to(to).emit('call-ended');
+    }
+  });
+
+  socket.on('call-offer', ({ to, offer }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-offer', { from: socket.id, offer });
+    }
+  });
+
+  socket.on('call-answer', ({ to, answer }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-answer', { from: socket.id, answer });
+    }
+  });
+
+  socket.on('call-ice', ({ to, candidate }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-ice', { from: socket.id, candidate });
     }
   });
 

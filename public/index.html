@@ -66,26 +66,32 @@
     }
     .sidebar .item:hover { background: var(--bg-hover); color: var(--text-primary); }
     .sidebar .item.active { background: var(--bg-active); color: var(--text-primary); }
-    .sidebar .item .icon { margin-right: 8px; }
 
-    .search-box { display: flex; gap: 4px; }
-    .search-box input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; }
-    .search-box input:focus { outline: none; border-color: var(--accent); }
-    .search-box button { padding: 8px 12px; border-radius: 8px; border: none; background: var(--accent); color: white; cursor: pointer; }
-
-    .invite-box { display: flex; gap: 4px; }
-    .invite-box input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; text-transform: uppercase; }
-    .invite-box button { padding: 8px 12px; border-radius: 8px; border: none; background: var(--green); color: #0f0f1a; cursor: pointer; font-weight: 700; }
-
-    .btn-create-server {
-      padding: 8px; border-radius: 8px; border: 2px dashed var(--border);
-      background: transparent; color: var(--text-secondary); cursor: pointer;
-      font-weight: 600; width: 100%; text-align: center;
+    .voice-channel-item {
+      padding: 8px 12px; border-radius: 8px; cursor: pointer;
+      color: var(--text-secondary); font-size: 13px;
+      display: flex; justify-content: space-between; align-items: center;
     }
-    .btn-create-server:hover { border-color: var(--accent); color: var(--text-primary); }
+    .voice-channel-item:hover { background: var(--bg-hover); }
+    .voice-channel-item .voice-users {
+      font-size: 11px; color: var(--text-muted);
+    }
+    .voice-channel-item .voice-users .user-badge {
+      display: inline-block; background: var(--bg-active);
+      padding: 2px 8px; border-radius: 12px; margin: 2px;
+      font-size: 10px;
+    }
+    .voice-channel-item .voice-users .user-badge.speaking {
+      border: 2px solid var(--green);
+      animation: pulse-border 0.5s infinite;
+    }
+    @keyframes pulse-border {
+      0%, 100% { border-color: var(--green); opacity: 1; }
+      50% { border-color: transparent; opacity: 0.5; }
+    }
 
     .online-user {
-      padding: 6px 10px; border-radius: 8px; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px;
       display: flex; justify-content: space-between; align-items: center;
     }
     .online-user:hover { background: var(--bg-hover); }
@@ -95,7 +101,6 @@
       background: var(--green); border: none; padding: 2px 10px; border-radius: 6px;
       cursor: pointer; font-weight: 700; font-size: 11px; color: #0f0f1a;
     }
-    .online-user .btn-call:hover { opacity: 0.8; }
 
     .friend-item {
       display: flex; justify-content: space-between; align-items: center;
@@ -120,9 +125,6 @@
       background: var(--green); color: #0f0f1a; cursor: pointer; font-weight: 700;
     }
 
-    .server-result { padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
-    .server-result:hover { background: var(--bg-hover); }
-
     .chat { flex: 1; display: flex; flex-direction: column; background: var(--bg-primary); min-width: 0; }
 
     .chat-header {
@@ -130,25 +132,19 @@
       display: flex; justify-content: space-between; align-items: center;
       background: var(--bg-secondary);
     }
-    .chat-header .chat-title { font-size: 16px; font-weight: 700; }
-    .chat-header .private-badge {
-      background: var(--accent); padding: 2px 12px; border-radius: 20px;
-      font-size: 10px; color: white; margin-left: 10px;
-    }
-    .chat-header .voice-controls button {
+    .chat-title { font-size: 16px; font-weight: 700; }
+    .private-badge { background: var(--accent); padding: 2px 12px; border-radius: 20px; font-size: 10px; color: white; margin-left: 10px; }
+    .voice-controls button {
       padding: 6px 14px; border: none; border-radius: 8px; cursor: pointer;
       font-weight: 600; font-size: 12px; margin-left: 6px;
     }
-    .chat-header .btn-voice { background: var(--green); color: #0f0f1a; }
-    .chat-header .btn-voice.active { background: var(--red); color: white; }
+    .btn-voice { background: var(--green); color: #0f0f1a; }
+    .btn-voice.active { background: var(--red); color: white; }
 
     .messages {
       flex: 1; padding: 16px 20px; overflow-y: auto;
       display: flex; flex-direction: column; gap: 4px;
     }
-    .messages::-webkit-scrollbar { width: 4px; }
-    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-
     .message {
       padding: 6px 14px; background: var(--bg-secondary); border-radius: 10px;
       max-width: 75%; word-wrap: break-word; animation: messageIn 0.2s ease;
@@ -156,7 +152,6 @@
     .message.own { align-self: flex-end; background: var(--bg-active); }
     @keyframes messageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     .message .msg-user { font-weight: 700; color: var(--accent); font-size: 12px; }
-    .message .msg-time { font-size: 9px; color: var(--text-muted); margin-left: 8px; }
     .message .msg-text { margin-top: 2px; font-size: 13px; }
 
     .input-area {
@@ -174,7 +169,7 @@
       background: var(--accent); color: white; font-weight: 700; cursor: pointer;
     }
 
-    /* ===== ОКНО ЗВОНКА ===== */
+    /* === ОКНО ЗВОНКА === */
     #call-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
@@ -193,17 +188,6 @@
     #call-window .call-status { color: var(--text-secondary); margin-bottom: 16px; }
     #call-window .call-timer { font-size: 32px; font-weight: 700; color: var(--green); margin-bottom: 16px; }
 
-    #call-window .voice-indicators {
-      display: flex; justify-content: center; gap: 30px; margin-bottom: 20px;
-      font-size: 13px; color: var(--text-secondary);
-    }
-    .voice-indicator {
-      width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-left: 6px;
-    }
-    .voice-indicator.speaking { background: var(--green); box-shadow: 0 0 20px rgba(0,212,160,0.5); animation: pulse 0.3s infinite alternate; }
-    .voice-indicator.silent { background: var(--text-muted); }
-    @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
-
     #call-window .call-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
     #call-window .call-buttons button {
       padding: 10px 24px; border: none; border-radius: 50px;
@@ -215,17 +199,18 @@
     .btn-mute { background: var(--bg-hover); color: var(--text-primary); }
     .btn-cancel { background: #fdcb6e; color: #0f0f1a; }
 
-    /* Voice channel indicator */
-    .voice-channel-badge {
-      background: var(--green); padding: 2px 10px; border-radius: 20px;
-      font-size: 10px; font-weight: 700; color: #0f0f1a; margin-left: 8px;
-    }
-    .voice-user-count { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+    .voice-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 6px; }
+    .voice-indicator.speaking { background: var(--green); animation: pulse 0.3s infinite alternate; }
+    .voice-indicator.silent { background: var(--text-muted); }
+    @keyframes pulse { 0% { opacity: 0.5; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1.2); } }
 
-    @media (max-width: 768px) {
-      .sidebar { width: 200px; min-width: 200px; }
-      #call-window { padding: 24px; min-width: auto; }
-      .auth-box { min-width: auto; padding: 24px; }
+    /* Ringtones */
+    .ringing {
+      animation: ring 0.5s infinite alternate;
+    }
+    @keyframes ring {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.05); }
     }
   </style>
 </head>
@@ -234,14 +219,14 @@
 <!-- ===== АВТОРИЗАЦИЯ ===== -->
 <div id="auth">
   <div class="auth-box" id="login">
-    <h2>💬 Discord clone by Artem</h2>
+    <h2>💬 Discord</h2>
     <input id="login-username" placeholder="Имя пользователя" />
     <input id="login-password" type="password" placeholder="Пароль" />
     <button class="btn-primary" onclick="login()">🚀 Войти</button>
     <span style="display:block;text-align:center;margin-top:12px;color:var(--text-secondary);">Нет аккаунта? <a onclick="showRegister()" style="color:var(--accent);cursor:pointer;">Регистрация</a></span>
   </div>
   <div class="auth-box hidden" id="register">
-    <h2>💬 Discord clone</h2>
+    <h2>💬 Discord</h2>
     <input id="reg-username" placeholder="Имя пользователя" />
     <input id="reg-password" type="password" placeholder="Пароль" />
     <button class="btn-primary" onclick="register()">🎉 Регистрация</button>
@@ -252,23 +237,23 @@
 <!-- ===== ОСНОВНОЙ ИНТЕРФЕЙС ===== -->
 <div id="app">
   <div class="sidebar">
-    <div class="logo">💬 Discord clone By Artem</div>
+    <div class="logo">💬 Discord</div>
     
     <div class="section-title">📡 СЕРВЕРА</div>
     <div id="servers-list"></div>
     
-    <div class="search-box">
-      <input id="server-search" placeholder="🔍 Поиск..." oninput="searchServers(this.value)" />
-      <button onclick="searchServers(document.getElementById('server-search').value)">Искать</button>
+    <div style="display:flex;gap:4px;">
+      <input id="server-search" placeholder="🔍 Поиск..." style="flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);" oninput="searchServers(this.value)" />
+      <button onclick="searchServers(document.getElementById('server-search').value)" style="padding:6px 12px;border-radius:8px;border:none;background:var(--accent);color:white;cursor:pointer;">Искать</button>
     </div>
     <div id="server-search-results"></div>
     
-    <div class="invite-box">
-      <input id="invite-code" placeholder="🔑 Код" />
-      <button onclick="joinServerByInvite()">➕</button>
+    <div style="display:flex;gap:4px;">
+      <input id="invite-code" placeholder="🔑 Код" style="flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);text-transform:uppercase;" />
+      <button onclick="joinServerByInvite()" style="padding:6px 12px;border-radius:8px;border:none;background:var(--green);color:#0f0f1a;cursor:pointer;font-weight:700;">➕</button>
     </div>
     
-    <button class="btn-create-server" onclick="createServer()">➕ Создать сервер</button>
+    <button class="btn-create-server" onclick="createServer()" style="padding:8px;border-radius:8px;border:2px dashed var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;font-weight:600;width:100%;">➕ Создать сервер</button>
     
     <div class="section-title" style="margin-top:12px;">👥 ДРУЗЬЯ</div>
     <div id="friends-list"></div>
@@ -284,9 +269,7 @@
   <div class="chat">
     <div class="chat-header" id="chat-header">
       <div class="chat-title" id="chat-title"># general</div>
-      <div class="voice-controls" id="voice-controls">
-        <button class="btn-voice" onclick="toggleVoiceChannel()">🎤 Войти в голосовой</button>
-      </div>
+      <div id="voice-controls"></div>
     </div>
     <div class="messages" id="messages"></div>
     <div class="input-area">
@@ -303,10 +286,6 @@
     <div class="caller-name" id="caller-name">Имя</div>
     <div class="call-status" id="call-status">Звонок...</div>
     <div class="call-timer" id="call-timer">00:00</div>
-    <div class="voice-indicators">
-      <span>Ты <span class="voice-indicator silent" id="my-voice-indicator"></span></span>
-      <span>Собеседник <span class="voice-indicator silent" id="their-voice-indicator"></span></span>
-    </div>
     <div class="call-buttons" id="call-buttons"></div>
   </div>
 </div>
@@ -317,7 +296,7 @@
 // ============================================================
 let socket, currentUser, currentChannel, currentServer, token;
 let localStream = null;
-let peerConnection = null;
+let peerConnections = {};
 let callInProgress = false;
 let currentCallerId = null;
 let currentCallerUsername = null;
@@ -327,12 +306,29 @@ let privateChatFriendId = null;
 let privateChatFriendName = null;
 let callTimerInterval = null;
 let callSeconds = 0;
-let audioContext = null;
-let analyser = null;
-let dataArray = null;
-let animationId = null;
 let inVoiceChannel = false;
 let currentVoiceChannelId = null;
+let voicePeerConnections = {};
+let ringtoneAudio = null;
+
+// ============================================================
+//  АУДИО ДЛЯ ЗВОНКА
+// ============================================================
+function playRingtone() {
+  try {
+    ringtoneAudio = new Audio('data:audio/wav;base64,UklGRlwAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YVoAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=');
+    ringtoneAudio.loop = true;
+    ringtoneAudio.volume = 0.7;
+    ringtoneAudio.play().catch(e => console.log('Ringtone error:', e));
+  } catch(e) {}
+}
+
+function stopRingtone() {
+  if (ringtoneAudio) {
+    ringtoneAudio.pause();
+    ringtoneAudio = null;
+  }
+}
 
 // ============================================================
 //  АВТОРИЗАЦИЯ
@@ -431,23 +427,33 @@ function initSocket() {
 
   // ===== ГОЛОСОВЫЕ КАНАЛЫ =====
   socket.on('voice-users', (users) => {
-    const count = users ? users.length : 0;
-    document.getElementById('voice-controls').innerHTML = `
-      <span style="color:var(--green);font-size:12px;">🟢 ${count} в голосовом</span>
-      <button class="btn-voice active" onclick="toggleVoiceChannel()" style="background:var(--red);color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;">⏹ Выйти</button>
-    `;
+    updateVoiceUsers(users);
   });
 
-  socket.on('voice-signal', async (data) => {
-    if (peerConnection) {
+  socket.on('voice-offer', async ({ from, offer }) => {
+    if (voicePeerConnections[from]) {
       try {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
-        if (data.signal.type === 'offer') {
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-          socket.emit('voice-signal', { to: data.from, signal: answer });
-        }
-      } catch (e) { console.error('Voice signal error:', e); }
+        await voicePeerConnections[from].setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await voicePeerConnections[from].createAnswer();
+        await voicePeerConnections[from].setLocalDescription(answer);
+        socket.emit('voice-answer', { to: from, answer });
+      } catch(e) { console.error('Voice offer error:', e); }
+    }
+  });
+
+  socket.on('voice-answer', async ({ from, answer }) => {
+    if (voicePeerConnections[from]) {
+      try {
+        await voicePeerConnections[from].setRemoteDescription(new RTCSessionDescription(answer));
+      } catch(e) { console.error('Voice answer error:', e); }
+    }
+  });
+
+  socket.on('voice-ice', async ({ from, candidate }) => {
+    if (voicePeerConnections[from]) {
+      try {
+        await voicePeerConnections[from].addIceCandidate(new RTCIceCandidate(candidate));
+      } catch(e) { console.error('ICE error:', e); }
     }
   });
 
@@ -455,21 +461,52 @@ function initSocket() {
   socket.on('incoming-call', (data) => {
     currentCallerId = data.from;
     currentCallerUsername = data.fromUsername || 'Неизвестный';
+    playRingtone();
     showCallWindow('incoming');
   });
 
-  socket.on('call-connected', (data) => {
+  socket.on('call-connected', () => {
+    stopRingtone();
     startTimer();
     showCallWindow('active');
   });
 
   socket.on('call-failed', (data) => {
+    stopRingtone();
     alert('❌ ' + (data.reason || 'Не удалось дозвониться'));
     endCall();
   });
 
   socket.on('call-ended', () => {
+    stopRingtone();
     endCall();
+  });
+
+  socket.on('call-offer', async ({ from, offer }) => {
+    if (callInProgress && peerConnections[from]) {
+      try {
+        await peerConnections[from].setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await peerConnections[from].createAnswer();
+        await peerConnections[from].setLocalDescription(answer);
+        socket.emit('call-answer', { to: from, answer });
+      } catch(e) { console.error('Call offer error:', e); }
+    }
+  });
+
+  socket.on('call-answer', async ({ from, answer }) => {
+    if (peerConnections[from]) {
+      try {
+        await peerConnections[from].setRemoteDescription(new RTCSessionDescription(answer));
+      } catch(e) { console.error('Call answer error:', e); }
+    }
+  });
+
+  socket.on('call-ice', async ({ from, candidate }) => {
+    if (peerConnections[from]) {
+      try {
+        await peerConnections[from].addIceCandidate(new RTCIceCandidate(candidate));
+      } catch(e) { console.error('ICE error:', e); }
+    }
   });
 }
 
@@ -504,7 +541,7 @@ async function searchServers(query) {
   const res = await fetch(`/servers/search/${encodeURIComponent(query)}`);
   const servers = await res.json();
   container.innerHTML = servers.map(s => `
-    <div class="server-result" onclick="joinServerById(${s.id})"># ${s.name} <span style="color:var(--text-muted);font-size:11px;">(${s.invite_code})</span></div>
+    <div class="item" onclick="joinServerById(${s.id})" style="font-size:12px;"># ${s.name} <span style="color:var(--text-muted);">(${s.invite_code})</span></div>
   `).join('');
 }
 
@@ -545,11 +582,16 @@ async function selectServer(serverId) {
   
   let html = '';
   channels.forEach(c => {
-    const isVoice = c.is_voice === 1;
-    const icon = isVoice ? '🎤' : '#';
-    html += `<div class="item" onclick="${isVoice ? `joinVoiceChannel(${c.id}, ${serverId})` : `selectChannel(${c.id})`}">
-      ${icon} ${c.name} ${isVoice ? '<span class="voice-user-count" id="voice-count-'+c.id+'">(0)</span>' : ''}
-    </div>`;
+    if (c.is_voice === 1) {
+      html += `<div class="voice-channel-item" onclick="toggleVoiceChannel(${c.id})" id="voice-channel-${c.id}">
+        <span>🎤 ${c.name}</span>
+        <span class="voice-users" id="voice-users-${c.id}">
+          <span style="color:var(--text-muted);font-size:10px;">0 в канале</span>
+        </span>
+      </div>`;
+    } else {
+      html += `<div class="item" onclick="selectChannel(${c.id})"># ${c.name}</div>`;
+    }
   });
   
   const createBtn = document.createElement('div');
@@ -594,59 +636,43 @@ async function selectChannel(channelId) {
 // ============================================================
 //  ГОЛОСОВЫЕ КАНАЛЫ
 // ============================================================
-async function joinVoiceChannel(channelId, serverId) {
-  if (inVoiceChannel) {
+async function toggleVoiceChannel(channelId) {
+  if (inVoiceChannel && currentVoiceChannelId === channelId) {
     leaveVoiceChannel();
     return;
   }
   
+  if (inVoiceChannel) {
+    leaveVoiceChannel();
+    setTimeout(() => joinVoiceChannel(channelId), 500);
+  } else {
+    joinVoiceChannel(channelId);
+  }
+}
+
+async function joinVoiceChannel(channelId) {
   currentVoiceChannelId = channelId;
   inVoiceChannel = true;
   
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    setupVoiceDetection();
     
-    socket.emit('join-voice-channel', {
+    socket.emit('voice-join', {
       channelId,
-      serverId,
+      serverId: currentServer,
       userId: currentUser.id,
       username: currentUser.username
     });
-    
-    // Создаем peer connection для голосового канала
-    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    peerConnection = new RTCPeerConnection(config);
-    
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    });
-    
-    peerConnection.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        const audio = new Audio();
-        audio.srcObject = event.streams[0];
-        audio.autoplay = true;
-        audio.play().catch(e => console.log('Audio error:', e));
-      }
-    };
-    
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        // Отправляем кандидаты всем в комнате
-        socket.emit('voice-signal', { to: 'broadcast', signal: { candidate: event.candidate } });
-      }
-    };
-    
-    // Создаем offer
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-    socket.emit('voice-signal', { to: 'broadcast', signal: offer });
     
     document.getElementById('voice-controls').innerHTML = `
       <span style="color:var(--green);font-size:12px;">🟢 В голосовом</span>
       <button class="btn-voice active" onclick="leaveVoiceChannel()" style="background:var(--red);color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;">⏹ Выйти</button>
     `;
+    
+    // Создаём соединения со всеми в канале
+    setTimeout(() => {
+      connectToVoicePeers();
+    }, 1000);
     
   } catch (e) {
     alert('❌ Нет доступа к микрофону!');
@@ -654,58 +680,70 @@ async function joinVoiceChannel(channelId, serverId) {
   }
 }
 
+function connectToVoicePeers() {
+  const roomName = `voice-${currentVoiceChannelId}`;
+  // Получаем список пользователей из сервера
+  fetch(`/channels/${currentServer}`)
+    .then(res => res.json())
+    .then(channels => {
+      const voiceChannel = channels.find(c => c.id === currentVoiceChannelId);
+      if (voiceChannel) {
+        // Запрашиваем список пользователей в канале
+        socket.emit('voice-join', {
+          channelId: currentVoiceChannelId,
+          serverId: currentServer,
+          userId: currentUser.id,
+          username: currentUser.username
+        });
+      }
+    });
+}
+
+function updateVoiceUsers(users) {
+  if (!currentVoiceChannelId) return;
+  
+  const container = document.getElementById(`voice-users-${currentVoiceChannelId}`);
+  if (!container) return;
+  
+  const userList = users || [];
+  const count = userList.length;
+  
+  let html = `<span style="color:var(--text-muted);font-size:10px;">${count} в канале</span>`;
+  if (count > 0) {
+    html += '<div style="margin-top:4px;">';
+    userList.forEach(u => {
+      const isMe = u.userId === currentUser.id;
+      html += `<span class="user-badge" id="voice-user-${u.userId}">${isMe ? '⭐' : ''} ${u.username}</span>`;
+    });
+    html += '</div>';
+  }
+  
+  container.innerHTML = html;
+}
+
 function leaveVoiceChannel() {
   if (currentVoiceChannelId) {
-    socket.emit('leave-voice-channel', {
+    socket.emit('voice-leave', {
       channelId: currentVoiceChannelId,
       userId: currentUser.id
     });
   }
   
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
+  // Закрываем все peer соединения
+  for (const id in voicePeerConnections) {
+    voicePeerConnections[id].close();
+    delete voicePeerConnections[id];
   }
+  
   if (localStream) {
     localStream.getTracks().forEach(t => t.stop());
     localStream = null;
-  }
-  if (audioContext) {
-    audioContext.close();
-    audioContext = null;
-  }
-  if (animationId) {
-    cancelAnimationFrame(animationId);
-    animationId = null;
   }
   
   inVoiceChannel = false;
   currentVoiceChannelId = null;
   
-  document.getElementById('voice-controls').innerHTML = `
-    <button class="btn-voice" onclick="toggleVoiceChannel()">🎤 Войти в голосовой</button>
-  `;
-  document.getElementById('my-voice-indicator').className = 'voice-indicator silent';
-}
-
-function toggleVoiceChannel() {
-  if (inVoiceChannel) {
-    leaveVoiceChannel();
-  } else {
-    // Находим голосовой канал на текущем сервере
-    if (currentServer) {
-      fetch(`/channels/${currentServer}`)
-        .then(res => res.json())
-        .then(channels => {
-          const voiceChannel = channels.find(c => c.is_voice === 1);
-          if (voiceChannel) {
-            joinVoiceChannel(voiceChannel.id, currentServer);
-          } else {
-            alert('Нет голосового канала на этом сервере! Создайте его.');
-          }
-        });
-    }
-  }
+  document.getElementById('voice-controls').innerHTML = '';
 }
 
 // ============================================================
@@ -807,7 +845,6 @@ function addPrivateMessage(msg) {
   if (isMine) div.classList.add('own');
   div.innerHTML = `
     <span class="msg-user">${isMine ? 'Ты' : privateChatFriendName}</span>
-    <span class="msg-time">${new Date(msg.timestamp).toLocaleTimeString()}</span>
     <div class="msg-text">${msg.content}</div>
   `;
   container.appendChild(div);
@@ -822,7 +859,6 @@ function addMessage(msg) {
   if (isMine) div.classList.add('own');
   div.innerHTML = `
     <span class="msg-user">${msg.username}</span>
-    <span class="msg-time">${new Date(msg.timestamp).toLocaleTimeString()}</span>
     <div class="msg-text">${msg.content}</div>
   `;
   container.appendChild(div);
@@ -862,7 +898,7 @@ function sendMessage() {
 }
 
 // ============================================================
-//  ЛИЧНЫЕ ЗВОНКИ (ПРОСТАЯ И НАДЁЖНАЯ ВЕРСИЯ)
+//  ЛИЧНЫЕ ЗВОНКИ (НОВАЯ ПРОВЕРЕННАЯ СХЕМА)
 // ============================================================
 async function startCall(socketId, username) {
   if (callInProgress) { alert('Уже в звонке!'); return; }
@@ -873,34 +909,35 @@ async function startCall(socketId, username) {
 
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    setupVoiceDetection();
 
     const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    peerConnection = new RTCPeerConnection(config);
+    const pc = new RTCPeerConnection(config);
+    peerConnections[socketId] = pc;
 
     localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
+      pc.addTrack(track, localStream);
     });
 
-    peerConnection.ontrack = (event) => {
+    pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         const audio = new Audio();
         audio.srcObject = event.streams[0];
         audio.autoplay = true;
+        audio.volume = 1.0;
         audio.play().catch(e => console.log('Audio error:', e));
       }
     };
 
-    peerConnection.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
       if (event.candidate) {
-        socket.emit('voice-signal', { to: socketId, signal: { candidate: event.candidate } });
+        socket.emit('call-ice', { to: socketId, candidate: event.candidate });
       }
     };
 
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
-    socket.emit('voice-signal', { to: socketId, signal: offer });
+    socket.emit('call-offer', { to: socketId, offer });
     socket.emit('call-user', { to: socketId, fromUsername: currentUser.username });
 
     callInProgress = true;
@@ -915,39 +952,42 @@ async function acceptCall() {
   if (!currentCallerId) return;
   if (callInProgress) return;
 
+  stopRingtone();
+
   try {
     if (!localStream) {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setupVoiceDetection();
     }
 
     const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    peerConnection = new RTCPeerConnection(config);
+    const pc = new RTCPeerConnection(config);
+    peerConnections[currentCallerId] = pc;
 
     localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
+      pc.addTrack(track, localStream);
     });
 
-    peerConnection.ontrack = (event) => {
+    pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         const audio = new Audio();
         audio.srcObject = event.streams[0];
         audio.autoplay = true;
+        audio.volume = 1.0;
         audio.play().catch(e => console.log('Audio error:', e));
       }
     };
 
-    peerConnection.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
       if (event.candidate) {
-        socket.emit('voice-signal', { to: currentCallerId, signal: { candidate: event.candidate } });
+        socket.emit('call-ice', { to: currentCallerId, candidate: event.candidate });
       }
     };
 
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
 
-    socket.emit('voice-signal', { to: currentCallerId, signal: answer });
-    socket.emit('call-accepted', { to: currentCallerId });
+    socket.emit('call-answer', { to: currentCallerId, answer });
+    socket.emit('call-accept', { to: currentCallerId });
 
     callInProgress = true;
     startTimer();
@@ -959,8 +999,9 @@ async function acceptCall() {
 }
 
 function rejectCall() {
+  stopRingtone();
   if (currentCallerId) {
-    socket.emit('call-rejected', { to: currentCallerId });
+    socket.emit('call-reject', { to: currentCallerId });
   }
   endCall();
 }
@@ -973,31 +1014,26 @@ function cancelCall() {
 }
 
 function endCall() {
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
+  stopRingtone();
+  
+  for (const id in peerConnections) {
+    peerConnections[id].close();
+    delete peerConnections[id];
   }
+  
   if (localStream && !inVoiceChannel) {
     localStream.getTracks().forEach(t => t.stop());
     localStream = null;
   }
-  if (audioContext && !inVoiceChannel) {
-    audioContext.close();
-    audioContext = null;
-  }
-  if (animationId) {
-    cancelAnimationFrame(animationId);
-    animationId = null;
-  }
+  
   if (callTimerInterval) {
     clearInterval(callTimerInterval);
     callTimerInterval = null;
   }
+  
   callInProgress = false;
   callSeconds = 0;
   document.getElementById('call-overlay').classList.remove('active');
-  document.getElementById('my-voice-indicator').className = 'voice-indicator silent';
-  document.getElementById('their-voice-indicator').className = 'voice-indicator silent';
   currentCallerId = null;
 }
 
@@ -1025,35 +1061,6 @@ function startTimer() {
   }, 1000);
 }
 
-function setupVoiceDetection() {
-  if (!localStream) return;
-  if (audioContext) audioContext.close();
-  audioContext = new AudioContext();
-  const source = audioContext.createMediaStreamSource(localStream);
-  analyser = audioContext.createAnalyser();
-  analyser.fftSize = 256;
-  source.connect(analyser);
-  dataArray = new Uint8Array(analyser.fftSize);
-  detectVoice();
-}
-
-function detectVoice() {
-  if (!analyser) return;
-  analyser.getByteTimeDomainData(dataArray);
-  let sum = 0;
-  for (let i = 0; i < dataArray.length; i++) {
-    const value = (dataArray[i] - 128) / 128;
-    sum += value * value;
-  }
-  const rms = Math.sqrt(sum / dataArray.length);
-  const isSpeaking = rms > 0.015;
-
-  const indicator = document.getElementById('my-voice-indicator');
-  indicator.className = isSpeaking ? 'voice-indicator speaking' : 'voice-indicator silent';
-
-  animationId = requestAnimationFrame(detectVoice);
-}
-
 // ============================================================
 //  UI ЗВОНКА
 // ============================================================
@@ -1076,7 +1083,7 @@ function showCallWindow(type) {
     statusEl.textContent = '📞 Входящий звонок...';
     timerEl.textContent = '00:00';
     buttonsEl.innerHTML = `
-      <button class="btn-accept" onclick="acceptCall()">📞 Принять</button>
+      <button class="btn-accept ringing" onclick="acceptCall()">📞 Принять</button>
       <button class="btn-reject" onclick="rejectCall()">❌ Отклонить</button>
     `;
   } else if (type === 'outgoing') {
