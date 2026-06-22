@@ -62,6 +62,16 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, friend_id)
   );
+
+  -- ЛИЧНЫЕ СООБЩЕНИЯ
+  CREATE TABLE IF NOT EXISTS private_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user INTEGER,
+    to_user INTEGER,
+    content TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    read INTEGER DEFAULT 0
+  );
 `);
 
 console.log('✅ База данных готова');
@@ -139,6 +149,30 @@ app.get('/friends/requests/:userId', (req, res) => {
   res.json(stmt.all(req.params.userId));
 });
 
+// ========== ЛИЧНЫЕ СООБЩЕНИЯ ==========
+app.post('/private/message', (req, res) => {
+  const { from_user, to_user, content } = req.body;
+  try {
+    const stmt = db.prepare('INSERT INTO private_messages (from_user, to_user, content) VALUES (?, ?, ?)');
+    const info = stmt.run(from_user, to_user, content);
+    res.json({ id: info.lastInsertRowid });
+  } catch (error) {
+    res.status(400).json({ error: 'Ошибка отправки' });
+  }
+});
+
+app.get('/private/messages/:userId/:friendId', (req, res) => {
+  const stmt = db.prepare(`
+    SELECT * FROM private_messages 
+    WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
+    ORDER BY timestamp ASC LIMIT 100
+  `);
+  res.json(stmt.all(
+    req.params.userId, req.params.friendId,
+    req.params.friendId, req.params.userId
+  ));
+});
+
 // ========== СЕРВЕРА И КАНАЛЫ ==========
 app.get('/servers/:userId', (req, res) => {
   const stmt = db.prepare(`
@@ -201,6 +235,7 @@ io.on('connection', (socket) => {
     socket.join(`channel-${channelId}`);
   });
 
+  // ===== ОБЩИЕ СООБЩЕНИЯ =====
   socket.on('message', (data) => {
     const { channelId, userId, content } = data;
     try {
@@ -220,17 +255,47 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ====== ВЕБРТК ЗВОНКИ ======
+  // ===== ЛИЧНЫЕ СООБЩЕНИЯ =====
+  socket.on('private-message', (data) => {
+    const { from_user, to_user, content, to_socket_id } = data;
+    try {
+      const stmt = db.prepare('INSERT INTO private_messages (from_user, to_user, content) VALUES (?, ?, ?)');
+      const info = stmt.run(from_user, to_user, content);
+      
+      const msgStmt = db.prepare(`
+        SELECT * FROM private_messages WHERE id = ?
+      `);
+      const msg = msgStmt.get(info.lastInsertRowid);
+      
+      // Отправляем собеседнику
+      if (to_socket_id) {
+        io.to(to_socket_id).emit('private-message', {
+          ...msg,
+          from_user,
+          to_user
+        });
+      }
+      
+      // Отправляем отправителю (для отображения)
+      socket.emit('private-message-sent', msg);
+    } catch (error) {
+      console.error('Ошибка личного сообщения:', error);
+    }
+  });
+
+  // ===== ВЕБРТК ЗВОНКИ (исправлено) =====
   socket.on('call-user', (data) => {
-    const { to, signal } = data;
+    const { to, signal, fromUsername } = data;
     const caller = onlineUsers[socket.id];
-    if (caller) {
+    if (caller && onlineUsers[to]) {
       io.to(to).emit('incoming-call', {
         from: socket.id,
         fromUserId: caller.userId,
-        fromUsername: caller.username,
+        fromUsername: fromUsername || caller.username,
         signal
       });
+    } else {
+      socket.emit('call-failed', { reason: 'Пользователь не в сети' });
     }
   });
 
@@ -241,10 +306,12 @@ io.on('connection', (socket) => {
 
   socket.on('ice-candidate', (data) => {
     const { to, candidate } = data;
-    io.to(to).emit('ice-candidate', {
-      from: socket.id,
-      candidate
-    });
+    if (onlineUsers[to]) {
+      io.to(to).emit('ice-candidate', {
+        from: socket.id,
+        candidate
+      });
+    }
   });
 
   socket.on('end-call', (data) => {
@@ -253,12 +320,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('voice-activity', (data) => {
-    // Передаем индикатор голоса собеседнику
     const { to, isSpeaking } = data;
-    io.to(to).emit('voice-activity', {
-      from: socket.id,
-      isSpeaking
-    });
+    if (onlineUsers[to]) {
+      io.to(to).emit('voice-activity', {
+        from: socket.id,
+        isSpeaking
+      });
+    }
   });
 
   socket.on('disconnect', () => {
