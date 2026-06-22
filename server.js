@@ -24,17 +24,14 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
-    password TEXT,
-    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_online INTEGER DEFAULT 0
+    password TEXT
   );
 
   CREATE TABLE IF NOT EXISTS servers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     owner_id INTEGER,
-    invite_code TEXT UNIQUE,
-    is_public INTEGER DEFAULT 1
+    invite_code TEXT UNIQUE
   );
 
   CREATE TABLE IF NOT EXISTS channels (
@@ -104,21 +101,8 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Неверный логин или пароль' });
   }
   
-  db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
-  
   const token = jwt.sign({ id: user.id, username: user.username }, SECRET);
   res.json({ token, user: { id: user.id, username: user.username } });
-});
-
-// ========== ПОЛУЧЕНИЕ СТАТУСА ПОЛЬЗОВАТЕЛЯ ==========
-app.get('/user/status/:userId', (req, res) => {
-  const stmt = db.prepare('SELECT is_online, last_seen FROM users WHERE id = ?');
-  const user = stmt.get(req.params.userId);
-  if (user) {
-    res.json(user);
-  } else {
-    res.status(404).json({ error: 'Пользователь не найден' });
-  }
 });
 
 // ========== СЕРВЕРА ==========
@@ -132,9 +116,9 @@ app.post('/servers', (req, res) => {
     
     db.prepare('INSERT INTO members (user_id, server_id) VALUES (?, ?)').run(owner_id, serverId);
     db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
-      .run('💬-общий', serverId, 1, 0);
+      .run('general', serverId, 1, 0);
     db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
-      .run('🔊-Голосовой', serverId, 1, 1);
+      .run('Голосовой канал', serverId, 1, 1);
     
     res.json({ id: serverId, name, invite_code: inviteCode });
   } catch (error) {
@@ -216,10 +200,10 @@ app.get('/messages/:channelId', (req, res) => {
   res.json(stmt.all(req.params.channelId));
 });
 
-// ========== ДРУЗЬЯ ==========
+// ========== ДРУЗЬЯ (МГНОВЕННО) ==========
 app.get('/users/search', (req, res) => {
   const { q } = req.query;
-  const stmt = db.prepare('SELECT id, username, is_online, last_seen FROM users WHERE username LIKE ? LIMIT 10');
+  const stmt = db.prepare('SELECT id, username FROM users WHERE username LIKE ? LIMIT 10');
   res.json(stmt.all(`%${q}%`));
 });
 
@@ -243,7 +227,7 @@ app.post('/friends/accept', (req, res) => {
 
 app.get('/friends/:userId', (req, res) => {
   const stmt = db.prepare(`
-    SELECT u.id, u.username, u.is_online, u.last_seen, f.status 
+    SELECT u.id, u.username, f.status 
     FROM friends f
     JOIN users u ON (u.id = f.friend_id OR u.id = f.user_id)
     WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted' AND u.id != ?
@@ -261,7 +245,7 @@ app.get('/friends/requests/:userId', (req, res) => {
   res.json(stmt.all(req.params.userId));
 });
 
-// ========== ЛИЧНЫЕ СООБЩЕНИЯ ==========
+// ========== ЛИЧНЫЕ СООБЩЕНИЯ (ЛС) ==========
 app.post('/private/message', (req, res) => {
   const { from_user, to_user, content } = req.body;
   try {
@@ -294,7 +278,6 @@ io.on('connection', (socket) => {
 
   socket.on('join', ({ userId, username }) => {
     onlineUsers[socket.id] = { userId, username, socketId: socket.id };
-    db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
     io.emit('users', Object.values(onlineUsers));
     console.log(`✅ ${username} онлайн`);
   });
@@ -307,6 +290,7 @@ io.on('connection', (socket) => {
     socket.join(`channel-${channelId}`);
   });
 
+  // ===== ОБЩИЕ СООБЩЕНИЯ =====
   socket.on('message', (data) => {
     const { channelId, userId, content } = data;
     try {
@@ -322,10 +306,11 @@ io.on('connection', (socket) => {
       const msg = msgStmt.get(info.lastInsertRowid);
       io.to(`channel-${channelId}`).emit('message', msg);
     } catch (error) {
-      console.error('Ошибка сообщения:', error);
+      console.error('Ошибка:', error);
     }
   });
 
+  // ===== ЛИЧНЫЕ СООБЩЕНИЯ (МГНОВЕННО) =====
   socket.on('private-message', (data) => {
     const { from_user, to_user, content, to_socket_id } = data;
     try {
@@ -335,33 +320,14 @@ io.on('connection', (socket) => {
       const msgStmt = db.prepare(`SELECT * FROM private_messages WHERE id = ?`);
       const msg = msgStmt.get(info.lastInsertRowid);
       
+      // Отправляем собеседнику
       if (to_socket_id) {
         io.to(to_socket_id).emit('private-message', { ...msg, from_user, to_user });
       }
+      // Отправляем отправителю
       socket.emit('private-message-sent', msg);
     } catch (error) {
-      console.error('Ошибка личного сообщения:', error);
-    }
-  });
-
-  // ===== ИНДИКАТОР ПЕЧАТАЕТ =====
-  socket.on('typing-start', ({ channelId, username }) => {
-    socket.to(`channel-${channelId}`).emit('user-typing', { username });
-  });
-
-  socket.on('typing-stop', ({ channelId }) => {
-    socket.to(`channel-${channelId}`).emit('user-stop-typing');
-  });
-
-  socket.on('private-typing-start', ({ to_socket_id, username }) => {
-    if (to_socket_id) {
-      io.to(to_socket_id).emit('private-user-typing', { username });
-    }
-  });
-
-  socket.on('private-typing-stop', ({ to_socket_id }) => {
-    if (to_socket_id) {
-      io.to(to_socket_id).emit('private-user-stop-typing');
+      console.error('Ошибка ЛС:', error);
     }
   });
 
@@ -379,7 +345,7 @@ io.on('connection', (socket) => {
     
     io.to(roomName).emit('voice-users', voiceRooms[roomName]);
     
-    console.log(`🎤 ${username} вошёл в голосовой канал ${channelId}`);
+    console.log(`🎤 ${username} вошёл в голосовой канал`);
   });
 
   socket.on('voice-leave', ({ channelId, userId }) => {
@@ -396,56 +362,53 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('voice-offer', ({ to, offer }) => {
-    io.to(to).emit('voice-offer', { from: socket.id, offer });
-  });
-
-  socket.on('voice-answer', ({ to, answer }) => {
-    io.to(to).emit('voice-answer', { from: socket.id, answer });
-  });
-
-  socket.on('voice-ice', ({ to, candidate }) => {
-    io.to(to).emit('voice-ice', { from: socket.id, candidate });
+  // WebRTC сигналинг для голоса
+  socket.on('voice-signal', ({ to, signal }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('voice-signal', { from: socket.id, signal });
+    }
   });
 
   // ===== ЛИЧНЫЕ ЗВОНКИ =====
   socket.on('call-user', ({ to, fromUsername }) => {
-    io.to(to).emit('incoming-call', {
-      from: socket.id,
-      fromUsername: fromUsername || 'Неизвестный'
-    });
+    if (onlineUsers[to]) {
+      io.to(to).emit('incoming-call', {
+        from: socket.id,
+        fromUsername: fromUsername || 'Неизвестный'
+      });
+    } else {
+      socket.emit('call-failed', { reason: 'Пользователь не в сети' });
+    }
   });
 
   socket.on('call-accept', ({ to }) => {
-    io.to(to).emit('call-connected', { from: socket.id });
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-connected', { from: socket.id });
+    }
   });
 
   socket.on('call-reject', ({ to }) => {
-    io.to(to).emit('call-rejected', { from: socket.id });
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-failed', { reason: 'Пользователь отклонил звонок' });
+    }
   });
 
   socket.on('call-end', ({ to }) => {
-    io.to(to).emit('call-ended', { from: socket.id });
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-ended');
+    }
   });
 
-  socket.on('call-offer', ({ to, offer }) => {
-    io.to(to).emit('call-offer', { from: socket.id, offer });
-  });
-
-  socket.on('call-answer', ({ to, answer }) => {
-    io.to(to).emit('call-answer', { from: socket.id, answer });
-  });
-
-  socket.on('call-ice', ({ to, candidate }) => {
-    io.to(to).emit('call-ice', { from: socket.id, candidate });
+  socket.on('call-signal', ({ to, signal }) => {
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-signal', { from: socket.id, signal });
+    }
   });
 
   socket.on('disconnect', () => {
     const user = onlineUsers[socket.id];
     if (user) {
       console.log(`❌ ${user.username} вышел`);
-      
-      db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.userId);
       
       for (const roomName in voiceRooms) {
         voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== user.userId);
