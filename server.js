@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const Database = require('better-sqlite3');
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -185,6 +186,11 @@ io.on('connection', (socket) => {
     delete onlineUsers[socket.id];
     io.emit('users', Object.values(onlineUsers));
   });
+});
+
+// ====== ОТДАЕМ HTML ДЛЯ ЛЮБОГО МАРШРУТА (ДЛЯ ТЕЛЕФОНА) ======
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ========== ЗАПУСК ==========
