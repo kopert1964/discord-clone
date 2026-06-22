@@ -6,18 +6,34 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIO(server, { cors: { origin: "*" } });
+const io = socketIO(server, { 
+  cors: { origin: "*" },
+  transports: ['websocket', 'polling']
+});
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// === БД ===
-const db = new sqlite3.Database('./discord.db');
+// === БД (исправлено для хостинга) ===
+// Сохраняем БД в /tmp на Render/Railway
+const dbPath = process.env.NODE_ENV === 'production' 
+  ? '/tmp/discord.db' 
+  : './discord.db';
 
+// Убедимся, что папка /tmp существует
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new sqlite3.Database(dbPath);
+
+// Создаем таблицы (с проверкой на существование)
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,24 +68,38 @@ db.serialize(() => {
     server_id INTEGER,
     PRIMARY KEY (user_id, server_id)
   )`);
+
+  console.log('✅ База данных подключена');
 });
 
-const SECRET = 'supersecretkey';
+const SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
 // === РЕГИСТРАЦИЯ ===
 app.post('/register', async (req, res) => {
-  const { username, password } = req.body;
-  const hash = await bcrypt.hash(password, 10);
-  db.run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hash], function(err) {
-    if (err) return res.status(400).json({ error: 'User exists' });
-    res.json({ id: this.lastID, username });
-  });
+  try {
+    const { username, password } = req.body;
+    const hash = await bcrypt.hash(password, 10);
+    db.run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hash], function(err) {
+      if (err) {
+        console.error('Ошибка регистрации:', err);
+        return res.status(400).json({ error: 'User exists' });
+      }
+      res.json({ id: this.lastID, username });
+    });
+  } catch (error) {
+    console.error('Ошибка:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // === ЛОГИН ===
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
+    if (err) {
+      console.error('Ошибка логина:', err);
+      return res.status(500).json({ error: 'Server error' });
+    }
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -78,14 +108,18 @@ app.post('/login', (req, res) => {
   });
 });
 
-// === ПОЛУЧИТЬ СЕРВЕРА ПОЛЬЗОВАТЕЛЯ ===
+// === ПОЛУЧИТЬ СЕРВЕРА ===
 app.get('/servers/:userId', (req, res) => {
   db.all(`
     SELECT s.* FROM servers s
     JOIN members m ON m.server_id = s.id
     WHERE m.user_id = ?
   `, [req.params.userId], (err, rows) => {
-    res.json(rows);
+    if (err) {
+      console.error('Ошибка получения серверов:', err);
+      return res.status(500).json({ error: 'Server error' });
+    }
+    res.json(rows || []);
   });
 });
 
@@ -93,7 +127,10 @@ app.get('/servers/:userId', (req, res) => {
 app.post('/servers', (req, res) => {
   const { name, owner_id } = req.body;
   db.run('INSERT INTO servers (name, owner_id) VALUES (?, ?)', [name, owner_id], function(err) {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) {
+      console.error('Ошибка создания сервера:', err);
+      return res.status(400).json({ error: err.message });
+    }
     const serverId = this.lastID;
     db.run('INSERT INTO members (user_id, server_id) VALUES (?, ?)', [owner_id, serverId]);
     db.run('INSERT INTO channels (name, server_id, type) VALUES (?, ?, ?)', ['general', serverId, 'text']);
@@ -101,14 +138,18 @@ app.post('/servers', (req, res) => {
   });
 });
 
-// === ПОЛУЧИТЬ КАНАЛЫ СЕРВЕРА ===
+// === ПОЛУЧИТЬ КАНАЛЫ ===
 app.get('/channels/:serverId', (req, res) => {
   db.all('SELECT * FROM channels WHERE server_id = ?', [req.params.serverId], (err, rows) => {
-    res.json(rows);
+    if (err) {
+      console.error('Ошибка получения каналов:', err);
+      return res.status(500).json({ error: 'Server error' });
+    }
+    res.json(rows || []);
   });
 });
 
-// === ПОЛУЧИТЬ СООБЩЕНИЯ КАНАЛА ===
+// === ПОЛУЧИТЬ СООБЩЕНИЯ ===
 app.get('/messages/:channelId', (req, res) => {
   db.all(`
     SELECT m.*, u.username, u.avatar 
@@ -117,21 +158,30 @@ app.get('/messages/:channelId', (req, res) => {
     WHERE m.channel_id = ?
     ORDER BY m.timestamp ASC LIMIT 100
   `, [req.params.channelId], (err, rows) => {
-    res.json(rows);
+    if (err) {
+      console.error('Ошибка получения сообщений:', err);
+      return res.status(500).json({ error: 'Server error' });
+    }
+    res.json(rows || []);
   });
 });
 
-// === ПОИСК ПОЛЬЗОВАТЕЛЕЙ (для добавления в друзья) ===
+// === ПОИСК ПОЛЬЗОВАТЕЛЕЙ ===
 app.get('/users/search', (req, res) => {
   const { q } = req.query;
   db.all('SELECT id, username FROM users WHERE username LIKE ? LIMIT 10', [`%${q}%`], (err, rows) => {
-    res.json(rows);
+    if (err) {
+      console.error('Ошибка поиска:', err);
+      return res.status(500).json({ error: 'Server error' });
+    }
+    res.json(rows || []);
   });
 });
 
 // === ПРИГЛАСИТЕЛЬНАЯ ССЫЛКА ===
 app.get('/invite/:serverId', (req, res) => {
-  res.json({ link: `http://localhost:3000/join/${req.params.serverId}` });
+  const baseUrl = process.env.RENDER_URL || process.env.RAILWAY_URL || 'http://localhost:3000';
+  res.json({ link: `${baseUrl}/join/${req.params.serverId}` });
 });
 
 // ======== SOCKET.IO ========
@@ -158,21 +208,26 @@ io.on('connection', (socket) => {
     db.run('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)',
       [channelId, userId, content],
       function(err) {
-        if (!err) {
-          db.get(`
-            SELECT m.*, u.username, u.avatar 
-            FROM messages m
-            JOIN users u ON u.id = m.user_id
-            WHERE m.id = ?
-          `, [this.lastID], (err, msg) => {
-            io.to(`channel-${channelId}`).emit('message', msg);
-          });
+        if (err) {
+          console.error('Ошибка сохранения сообщения:', err);
+          return;
         }
+        db.get(`
+          SELECT m.*, u.username, u.avatar 
+          FROM messages m
+          JOIN users u ON u.id = m.user_id
+          WHERE m.id = ?
+        `, [this.lastID], (err, msg) => {
+          if (err) {
+            console.error('Ошибка получения сообщения:', err);
+            return;
+          }
+          io.to(`channel-${channelId}`).emit('message', msg);
+        });
       }
     );
   });
 
-  // WebRTC сигналинг
   socket.on('signal', (data) => {
     socket.to(data.to).emit('signal', {
       from: socket.id,
@@ -186,6 +241,19 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(3000, '0.0.0.0', () => {
-  console.log('🚀 Сервер запущен на http://localhost:3000');
+// === ЗАПУСК СЕРВЕРА ===
+const port = process.env.PORT || 3000;
+server.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 Сервер запущен на порту ${port}`);
+  console.log(`📍 База данных: ${dbPath}`);
+  console.log(`🌐 Режим: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Обработка ошибок (чтобы сервер не падал)
+process.on('uncaughtException', (err) => {
+  console.error('Необработанная ошибка:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('Необработанный reject:', err);
 });
