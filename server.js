@@ -33,7 +33,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     owner_id INTEGER,
-    invite_code TEXT UNIQUE
+    invite_code TEXT UNIQUE,
+    is_public INTEGER DEFAULT 1
   );
 
   CREATE TABLE IF NOT EXISTS channels (
@@ -103,7 +104,6 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Неверный логин или пароль' });
   }
   
-  // Обновляем статус онлайн
   db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
   
   const token = jwt.sign({ id: user.id, username: user.username }, SECRET);
@@ -132,9 +132,9 @@ app.post('/servers', (req, res) => {
     
     db.prepare('INSERT INTO members (user_id, server_id) VALUES (?, ?)').run(owner_id, serverId);
     db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
-      .run('general', serverId, 1, 0);
+      .run('💬-общий', serverId, 1, 0);
     db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
-      .run('Голосовой канал', serverId, 1, 1);
+      .run('🔊-Голосовой', serverId, 1, 1);
     
     res.json({ id: serverId, name, invite_code: inviteCode });
   } catch (error) {
@@ -294,10 +294,7 @@ io.on('connection', (socket) => {
 
   socket.on('join', ({ userId, username }) => {
     onlineUsers[socket.id] = { userId, username, socketId: socket.id };
-    
-    // Обновляем статус в базе данных
     db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
-    
     io.emit('users', Object.values(onlineUsers));
     console.log(`✅ ${username} онлайн`);
   });
@@ -325,7 +322,7 @@ io.on('connection', (socket) => {
       const msg = msgStmt.get(info.lastInsertRowid);
       io.to(`channel-${channelId}`).emit('message', msg);
     } catch (error) {
-      console.error('Ошибка:', error);
+      console.error('Ошибка сообщения:', error);
     }
   });
 
@@ -347,6 +344,27 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ===== ИНДИКАТОР ПЕЧАТАЕТ =====
+  socket.on('typing-start', ({ channelId, username }) => {
+    socket.to(`channel-${channelId}`).emit('user-typing', { username });
+  });
+
+  socket.on('typing-stop', ({ channelId }) => {
+    socket.to(`channel-${channelId}`).emit('user-stop-typing');
+  });
+
+  socket.on('private-typing-start', ({ to_socket_id, username }) => {
+    if (to_socket_id) {
+      io.to(to_socket_id).emit('private-user-typing', { username });
+    }
+  });
+
+  socket.on('private-typing-stop', ({ to_socket_id }) => {
+    if (to_socket_id) {
+      io.to(to_socket_id).emit('private-user-stop-typing');
+    }
+  });
+
   // ===== ГОЛОСОВЫЕ КАНАЛЫ =====
   socket.on('voice-join', ({ channelId, serverId, userId, username }) => {
     const roomName = `voice-${channelId}`;
@@ -360,9 +378,6 @@ io.on('connection', (socket) => {
     voiceRooms[roomName].push({ userId, username, socketId: socket.id });
     
     io.to(roomName).emit('voice-users', voiceRooms[roomName]);
-    
-    // Отправляем существующих пользователей новому участнику
-    socket.emit('voice-existing-users', voiceRooms[roomName].filter(u => u.userId !== userId));
     
     console.log(`🎤 ${username} вошёл в голосовой канал ${channelId}`);
   });
@@ -381,7 +396,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // WebRTC сигналинг для голосовых каналов
   socket.on('voice-offer', ({ to, offer }) => {
     io.to(to).emit('voice-offer', { from: socket.id, offer });
   });
@@ -394,7 +408,7 @@ io.on('connection', (socket) => {
     io.to(to).emit('voice-ice', { from: socket.id, candidate });
   });
 
-  // ===== ЛИЧНЫЕ ЗВОНКИ (ИСПРАВЛЕННАЯ ЛОГИКА) =====
+  // ===== ЛИЧНЫЕ ЗВОНКИ =====
   socket.on('call-user', ({ to, fromUsername }) => {
     io.to(to).emit('incoming-call', {
       from: socket.id,
@@ -414,7 +428,6 @@ io.on('connection', (socket) => {
     io.to(to).emit('call-ended', { from: socket.id });
   });
 
-  // Важно: передача offer/answer строго по назначению
   socket.on('call-offer', ({ to, offer }) => {
     io.to(to).emit('call-offer', { from: socket.id, offer });
   });
@@ -432,10 +445,8 @@ io.on('connection', (socket) => {
     if (user) {
       console.log(`❌ ${user.username} вышел`);
       
-      // Обновляем статус в базе данных
       db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.userId);
       
-      // Удаляем из голосовых комнат
       for (const roomName in voiceRooms) {
         voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== user.userId);
         io.to(roomName).emit('voice-users', voiceRooms[roomName]);
