@@ -54,12 +54,11 @@ db.exec(`
     PRIMARY KEY (user_id, server_id)
   );
 
-  -- НОВЫЕ ТАБЛИЦЫ ДЛЯ ДРУЗЕЙ
   CREATE TABLE IF NOT EXISTS friends (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     friend_id INTEGER,
-    status TEXT DEFAULT 'pending', -- pending, accepted, blocked
+    status TEXT DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, friend_id)
   );
@@ -69,7 +68,7 @@ console.log('✅ База данных готова');
 
 const SECRET = 'supersecretkey';
 
-// ========== РЕГИСТРАЦИЯ ==========
+// ========== АУТЕНТИФИКАЦИЯ ==========
 app.post('/register', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -82,7 +81,6 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// ========== ЛОГИН ==========
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
@@ -96,14 +94,13 @@ app.post('/login', async (req, res) => {
   res.json({ token, user: { id: user.id, username: user.username } });
 });
 
-// ========== ПОИСК ПОЛЬЗОВАТЕЛЕЙ ==========
+// ========== ДРУЗЬЯ ==========
 app.get('/users/search', (req, res) => {
   const { q } = req.query;
   const stmt = db.prepare('SELECT id, username FROM users WHERE username LIKE ? LIMIT 10');
   res.json(stmt.all(`%${q}%`));
 });
 
-// ========== ОТПРАВИТЬ ЗАЯВКУ В ДРУЗЬЯ ==========
 app.post('/friends/request', (req, res) => {
   const { userId, friendId } = req.body;
   try {
@@ -115,7 +112,6 @@ app.post('/friends/request', (req, res) => {
   }
 });
 
-// ========== ПРИНЯТЬ ЗАЯВКУ ==========
 app.post('/friends/accept', (req, res) => {
   const { userId, friendId } = req.body;
   const stmt = db.prepare('UPDATE friends SET status = "accepted" WHERE user_id = ? AND friend_id = ?');
@@ -123,7 +119,6 @@ app.post('/friends/accept', (req, res) => {
   res.json({ success: true });
 });
 
-// ========== ПОЛУЧИТЬ СПИСОК ДРУЗЕЙ ==========
 app.get('/friends/:userId', (req, res) => {
   const stmt = db.prepare(`
     SELECT u.id, u.username, f.status 
@@ -134,7 +129,6 @@ app.get('/friends/:userId', (req, res) => {
   res.json(stmt.all(req.params.userId, req.params.userId, req.params.userId));
 });
 
-// ========== ПОЛУЧИТЬ ЗАЯВКИ ==========
 app.get('/friends/requests/:userId', (req, res) => {
   const stmt = db.prepare(`
     SELECT u.id, u.username 
@@ -145,7 +139,7 @@ app.get('/friends/requests/:userId', (req, res) => {
   res.json(stmt.all(req.params.userId));
 });
 
-// ========== СЕРВЕРА ==========
+// ========== СЕРВЕРА И КАНАЛЫ ==========
 app.get('/servers/:userId', (req, res) => {
   const stmt = db.prepare(`
     SELECT s.* FROM servers s
@@ -171,13 +165,11 @@ app.post('/servers', (req, res) => {
   }
 });
 
-// ========== КАНАЛЫ ==========
 app.get('/channels/:serverId', (req, res) => {
   const stmt = db.prepare('SELECT * FROM channels WHERE server_id = ?');
   res.json(stmt.all(req.params.serverId));
 });
 
-// ========== СООБЩЕНИЯ ==========
 app.get('/messages/:channelId', (req, res) => {
   const stmt = db.prepare(`
     SELECT m.*, u.username 
@@ -209,7 +201,6 @@ io.on('connection', (socket) => {
     socket.join(`channel-${channelId}`);
   });
 
-  // ====== СООБЩЕНИЯ ======
   socket.on('message', (data) => {
     const { channelId, userId, content } = data;
     try {
@@ -229,22 +220,23 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ====== ВЕБРТК СИГНАЛИНГ (для звонков) ======
+  // ====== ВЕБРТК ЗВОНКИ ======
   socket.on('call-user', (data) => {
     const { to, signal } = data;
-    // Отправляем сигнал конкретному пользователю
-    io.to(to).emit('incoming-call', {
-      from: socket.id,
-      fromUsername: onlineUsers[socket.id]?.username,
-      signal
-    });
+    const caller = onlineUsers[socket.id];
+    if (caller) {
+      io.to(to).emit('incoming-call', {
+        from: socket.id,
+        fromUserId: caller.userId,
+        fromUsername: caller.username,
+        signal
+      });
+    }
   });
 
   socket.on('answer-call', (data) => {
     const { to, signal } = data;
-    io.to(to).emit('call-answered', {
-      signal
-    });
+    io.to(to).emit('call-answered', { signal });
   });
 
   socket.on('ice-candidate', (data) => {
@@ -260,6 +252,15 @@ io.on('connection', (socket) => {
     io.to(to).emit('call-ended');
   });
 
+  socket.on('voice-activity', (data) => {
+    // Передаем индикатор голоса собеседнику
+    const { to, isSpeaking } = data;
+    io.to(to).emit('voice-activity', {
+      from: socket.id,
+      isSpeaking
+    });
+  });
+
   socket.on('disconnect', () => {
     const user = onlineUsers[socket.id];
     if (user) {
@@ -270,12 +271,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// ====== ОТДАЕМ HTML ДЛЯ ЛЮБОГО МАРШРУТА ======
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ========== ЗАПУСК ==========
 const port = process.env.PORT || 3000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Сервер запущен на порту ${port}`);
