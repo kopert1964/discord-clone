@@ -18,7 +18,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// ========== БАЗА ДАННЫХ ==========
 const db = new Database('/tmp/discord.db');
 
 db.exec(`
@@ -31,13 +30,15 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS servers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
-    owner_id INTEGER
+    owner_id INTEGER,
+    invite_code TEXT UNIQUE
   );
 
   CREATE TABLE IF NOT EXISTS channels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
-    server_id INTEGER
+    server_id INTEGER,
+    is_public INTEGER DEFAULT 1
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -63,7 +64,6 @@ db.exec(`
     UNIQUE(user_id, friend_id)
   );
 
-  -- ЛИЧНЫЕ СООБЩЕНИЯ
   CREATE TABLE IF NOT EXISTS private_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     from_user INTEGER,
@@ -102,6 +102,98 @@ app.post('/login', async (req, res) => {
   
   const token = jwt.sign({ id: user.id, username: user.username }, SECRET);
   res.json({ token, user: { id: user.id, username: user.username } });
+});
+
+// ========== СЕРВЕРА С ИНВАЙТ-КОДАМИ ==========
+app.post('/servers', (req, res) => {
+  const { name, owner_id } = req.body;
+  try {
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const stmt = db.prepare('INSERT INTO servers (name, owner_id, invite_code) VALUES (?, ?, ?)');
+    const info = stmt.run(name, owner_id, inviteCode);
+    const serverId = info.lastInsertRowid;
+    
+    db.prepare('INSERT INTO members (user_id, server_id) VALUES (?, ?)').run(owner_id, serverId);
+    db.prepare('INSERT INTO channels (name, server_id, is_public) VALUES (?, ?, ?)').run('general', serverId, 1);
+    
+    res.json({ id: serverId, name, invite_code: inviteCode });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/servers/:userId', (req, res) => {
+  const stmt = db.prepare(`
+    SELECT s.* FROM servers s
+    JOIN members m ON m.server_id = s.id
+    WHERE m.user_id = ?
+  `);
+  res.json(stmt.all(req.params.userId));
+});
+
+app.get('/servers/search/:query', (req, res) => {
+  const stmt = db.prepare(`
+    SELECT s.* FROM servers s
+    WHERE s.name LIKE ? AND s.is_public = 1
+    LIMIT 20
+  `);
+  res.json(stmt.all(`%${req.params.query}%`));
+});
+
+app.post('/servers/join', (req, res) => {
+  const { invite_code, user_id } = req.body;
+  try {
+    const stmt = db.prepare('SELECT id FROM servers WHERE invite_code = ?');
+    const server = stmt.get(invite_code);
+    if (!server) {
+      return res.status(404).json({ error: 'Сервер не найден' });
+    }
+    
+    db.prepare('INSERT OR IGNORE INTO members (user_id, server_id) VALUES (?, ?)')
+      .run(user_id, server.id);
+    res.json({ success: true, server_id: server.id });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/servers/invite/:serverId', (req, res) => {
+  const stmt = db.prepare('SELECT invite_code FROM servers WHERE id = ?');
+  const server = stmt.get(req.params.serverId);
+  if (server) {
+    res.json({ invite_code: server.invite_code });
+  } else {
+    res.status(404).json({ error: 'Сервер не найден' });
+  }
+});
+
+// ========== КАНАЛЫ ==========
+app.get('/channels/:serverId', (req, res) => {
+  const stmt = db.prepare('SELECT * FROM channels WHERE server_id = ?');
+  res.json(stmt.all(req.params.serverId));
+});
+
+app.post('/channels', (req, res) => {
+  const { name, server_id, is_public } = req.body;
+  try {
+    const stmt = db.prepare('INSERT INTO channels (name, server_id, is_public) VALUES (?, ?, ?)');
+    const info = stmt.run(name, server_id, is_public || 1);
+    res.json({ id: info.lastInsertRowid, name, server_id, is_public: is_public || 1 });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ========== СООБЩЕНИЯ ==========
+app.get('/messages/:channelId', (req, res) => {
+  const stmt = db.prepare(`
+    SELECT m.*, u.username 
+    FROM messages m
+    JOIN users u ON u.id = m.user_id
+    WHERE m.channel_id = ?
+    ORDER BY m.timestamp ASC LIMIT 100
+  `);
+  res.json(stmt.all(req.params.channelId));
 });
 
 // ========== ДРУЗЬЯ ==========
@@ -173,48 +265,6 @@ app.get('/private/messages/:userId/:friendId', (req, res) => {
   ));
 });
 
-// ========== СЕРВЕРА И КАНАЛЫ ==========
-app.get('/servers/:userId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT s.* FROM servers s
-    JOIN members m ON m.server_id = s.id
-    WHERE m.user_id = ?
-  `);
-  res.json(stmt.all(req.params.userId));
-});
-
-app.post('/servers', (req, res) => {
-  const { name, owner_id } = req.body;
-  try {
-    const stmt = db.prepare('INSERT INTO servers (name, owner_id) VALUES (?, ?)');
-    const info = stmt.run(name, owner_id);
-    const serverId = info.lastInsertRowid;
-    
-    db.prepare('INSERT INTO members (user_id, server_id) VALUES (?, ?)').run(owner_id, serverId);
-    db.prepare('INSERT INTO channels (name, server_id) VALUES (?, ?)').run('general', serverId);
-    
-    res.json({ id: serverId, name });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.get('/channels/:serverId', (req, res) => {
-  const stmt = db.prepare('SELECT * FROM channels WHERE server_id = ?');
-  res.json(stmt.all(req.params.serverId));
-});
-
-app.get('/messages/:channelId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT m.*, u.username 
-    FROM messages m
-    JOIN users u ON u.id = m.user_id
-    WHERE m.channel_id = ?
-    ORDER BY m.timestamp ASC LIMIT 100
-  `);
-  res.json(stmt.all(req.params.channelId));
-});
-
 // ========== SOCKET.IO ==========
 const onlineUsers = {};
 
@@ -235,7 +285,6 @@ io.on('connection', (socket) => {
     socket.join(`channel-${channelId}`);
   });
 
-  // ===== ОБЩИЕ СООБЩЕНИЯ =====
   socket.on('message', (data) => {
     const { channelId, userId, content } = data;
     try {
@@ -255,35 +304,25 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ===== ЛИЧНЫЕ СООБЩЕНИЯ =====
   socket.on('private-message', (data) => {
     const { from_user, to_user, content, to_socket_id } = data;
     try {
       const stmt = db.prepare('INSERT INTO private_messages (from_user, to_user, content) VALUES (?, ?, ?)');
       const info = stmt.run(from_user, to_user, content);
       
-      const msgStmt = db.prepare(`
-        SELECT * FROM private_messages WHERE id = ?
-      `);
+      const msgStmt = db.prepare(`SELECT * FROM private_messages WHERE id = ?`);
       const msg = msgStmt.get(info.lastInsertRowid);
       
-      // Отправляем собеседнику
       if (to_socket_id) {
-        io.to(to_socket_id).emit('private-message', {
-          ...msg,
-          from_user,
-          to_user
-        });
+        io.to(to_socket_id).emit('private-message', { ...msg, from_user, to_user });
       }
-      
-      // Отправляем отправителю (для отображения)
       socket.emit('private-message-sent', msg);
     } catch (error) {
       console.error('Ошибка личного сообщения:', error);
     }
   });
 
-  // ===== ВЕБРТК ЗВОНКИ (исправлено) =====
+  // ===== ИСПРАВЛЕННЫЙ ВЕБРТК =====
   socket.on('call-user', (data) => {
     const { to, signal, fromUsername } = data;
     const caller = onlineUsers[socket.id];
@@ -301,39 +340,35 @@ io.on('connection', (socket) => {
 
   socket.on('answer-call', (data) => {
     const { to, signal } = data;
-    io.to(to).emit('call-answered', { signal });
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-answered', { signal });
+    }
   });
 
   socket.on('ice-candidate', (data) => {
     const { to, candidate } = data;
     if (onlineUsers[to]) {
-      io.to(to).emit('ice-candidate', {
-        from: socket.id,
-        candidate
-      });
+      io.to(to).emit('ice-candidate', { from: socket.id, candidate });
     }
   });
 
   socket.on('end-call', (data) => {
     const { to } = data;
-    io.to(to).emit('call-ended');
+    if (onlineUsers[to]) {
+      io.to(to).emit('call-ended');
+    }
   });
 
   socket.on('voice-activity', (data) => {
     const { to, isSpeaking } = data;
     if (onlineUsers[to]) {
-      io.to(to).emit('voice-activity', {
-        from: socket.id,
-        isSpeaking
-      });
+      io.to(to).emit('voice-activity', { from: socket.id, isSpeaking });
     }
   });
 
   socket.on('disconnect', () => {
     const user = onlineUsers[socket.id];
-    if (user) {
-      console.log(`❌ ${user.username} вышел`);
-    }
+    if (user) console.log(`❌ ${user.username} вышел`);
     delete onlineUsers[socket.id];
     io.emit('users', Object.values(onlineUsers));
   });
