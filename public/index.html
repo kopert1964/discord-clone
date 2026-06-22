@@ -320,7 +320,7 @@
 // ============================================================
 let socket, currentUser, currentChannel, currentServer, token;
 let localStream = null;
-let peerConnections = {};
+let peerConnection = null; // ОДНО соединение вместо объекта
 let callInProgress = false;
 let currentCallerId = null;
 let currentCallerUsername = null;
@@ -338,6 +338,7 @@ let audioAnalyser = null;
 let visualizerInterval = null;
 let melodyInterval = null;
 let currentMelody = 1;
+let remoteAudioElement = null; // Для хранения аудио элемента
 
 // ============================================================
 //  ЗВУКИ И МЕЛОДИИ
@@ -525,7 +526,9 @@ function startAudioVisualization(stream) {
         bar.style.height = height + 'px';
       });
     }, 100);
-  } catch(e) {}
+  } catch(e) {
+    console.error('Visualization error:', e);
+  }
 }
 
 function stopAudioVisualization() {
@@ -632,6 +635,7 @@ function initSocket() {
   socket = io();
   
   socket.on('connect', () => {
+    console.log('✅ Подключен к серверу, socket ID:', socket.id);
     socket.emit('join', { userId: currentUser.id, username: currentUser.username });
   });
 
@@ -647,7 +651,6 @@ function initSocket() {
       </div>
     `).join('');
     
-    // Обновляем статусы друзей
     loadFriends();
   });
 
@@ -680,9 +683,9 @@ function initSocket() {
     await handleVoiceICE(from, candidate);
   });
 
-  // ===== ЛИЧНЫЕ ЗВОНКИ (ИСПРАВЛЕНО) =====
+  // ===== ЛИЧНЫЕ ЗВОНКИ =====
   socket.on('incoming-call', (data) => {
-    console.log('📞 Входящий звонок от:', data.fromUsername);
+    console.log('📞 Входящий звонок от:', data.fromUsername, 'socket:', data.from);
     currentCallerId = data.from;
     currentCallerUsername = data.fromUsername || 'Неизвестный';
     playRingtone();
@@ -690,11 +693,12 @@ function initSocket() {
   });
 
   socket.on('call-connected', (data) => {
-    console.log('✅ Звонок подключен');
+    console.log('✅ Звонок подключен, инициирую WebRTC...');
     stopRingtone();
-    playConnectSound();
-    startTimer();
-    showCallWindow('active');
+    // Тот кто принял звонок - создает offer
+    if (!callInProgress) {
+      createOffer();
+    }
   });
 
   socket.on('call-rejected', (data) => {
@@ -705,24 +709,26 @@ function initSocket() {
   });
 
   socket.on('call-ended', (data) => {
-    console.log('📴 Звонок завершен');
+    console.log('📴 Звонок завершен удаленной стороной');
     stopRingtone();
     playDisconnectSound();
     endCall();
   });
 
+  // WebRTC сигналы
   socket.on('call-offer', async ({ from, offer }) => {
     console.log('📨 Получен offer от:', from);
-    await handleCallOffer(from, offer);
+    await handleOffer(from, offer);
   });
 
   socket.on('call-answer', async ({ from, answer }) => {
     console.log('📨 Получен answer от:', from);
-    await handleCallAnswer(from, answer);
+    await handleAnswer(from, answer);
   });
 
   socket.on('call-ice', async ({ from, candidate }) => {
-    await handleCallICE(from, candidate);
+    console.log('🧊 Получен ICE кандидат от:', from);
+    await handleICE(from, candidate);
   });
 }
 
@@ -1204,8 +1210,10 @@ function sendMessage() {
 }
 
 // ============================================================
-//  ЛИЧНЫЕ ЗВОНКИ (ПОЛНОСТЬЮ ИСПРАВЛЕНО)
+//  ЛИЧНЫЕ ЗВОНКИ (ПОЛНОСТЬЮ ПЕРЕПИСАНО)
 // ============================================================
+
+// Тот кто звонит - создает offer
 async function startCall(socketId, username) {
   if (callInProgress) { 
     alert('У вас уже активный звонок!'); 
@@ -1216,7 +1224,7 @@ async function startCall(socketId, username) {
     return; 
   }
 
-  console.log('📞 Начинаем звонок:', username);
+  console.log('📞 Звоним пользователю:', username, 'socket:', socketId);
   currentCallerId = socketId;
   currentCallerUsername = username;
 
@@ -1230,60 +1238,14 @@ async function startCall(socketId, username) {
       }
     });
 
-    // Создаем peer connection
-    const config = { 
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' }
-      ] 
-    };
-    const pc = new RTCPeerConnection(config);
-    peerConnections[socketId] = pc;
-
-    // Добавляем локальный поток
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream);
-    });
-
-    // Обработка входящего аудио
-    pc.ontrack = (event) => {
-      console.log('🎵 Получен удаленный аудио поток');
-      if (event.streams && event.streams[0]) {
-        const remoteAudio = new Audio();
-        remoteAudio.srcObject = event.streams[0];
-        remoteAudio.autoplay = true;
-        remoteAudio.volume = 1.0;
-        remoteAudio.play().catch(e => console.log('Audio play error:', e));
-      }
-    };
-
-    // Отправка ICE кандидатов
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        console.log('🧊 Отправка ICE кандидата');
-        socket.emit('call-ice', { 
-          to: socketId, 
-          candidate: event.candidate 
-        });
-      }
-    };
-
-    // Создаем offer
-    console.log('📤 Создание offer...');
-    const offer = await pc.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: false
-    });
-    await pc.setLocalDescription(offer);
-    console.log('✅ Offer создан, отправка...');
+    callInProgress = true;
     
-    // Отправляем offer и уведомление о звонке
-    socket.emit('call-offer', { to: socketId, offer });
+    // Отправляем сигнал о звонке
     socket.emit('call-user', { 
       to: socketId, 
       fromUsername: currentUser.username 
     });
-
-    callInProgress = true;
+    
     showCallWindow('outgoing');
     
   } catch (e) {
@@ -1293,97 +1255,212 @@ async function startCall(socketId, username) {
   }
 }
 
-async function handleCallOffer(from, offer) {
-  console.log('📨 Обработка входящего offer от:', from);
+// Создаем WebRTC offer (вызывается когда звонок принят)
+async function createOffer() {
+  console.log('📤 Создаю WebRTC offer...');
   
   try {
-    // Создаем peer connection для ответа
+    // Закрываем старое соединение если есть
+    if (peerConnection) {
+      peerConnection.close();
+    }
+    
+    const config = { 
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ] 
+    };
+    
+    peerConnection = new RTCPeerConnection(config);
+    
+    // Добавляем локальный аудио поток
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        console.log('🎙️ Добавляю локальный трек:', track.kind);
+        peerConnection.addTrack(track, localStream);
+      });
+    }
+    
+    // Обработка входящего аудио
+    peerConnection.ontrack = (event) => {
+      console.log('🎵 Получен удаленный аудио поток!');
+      if (event.streams && event.streams[0]) {
+        // Удаляем старый аудио элемент если есть
+        if (remoteAudioElement) {
+          remoteAudioElement.srcObject = null;
+          remoteAudioElement.remove();
+        }
+        
+        remoteAudioElement = new Audio();
+        remoteAudioElement.srcObject = event.streams[0];
+        remoteAudioElement.autoplay = true;
+        remoteAudioElement.volume = 1.0;
+        
+        remoteAudioElement.play()
+          .then(() => console.log('✅ Удаленное аудио играет!'))
+          .catch(e => console.error('❌ Ошибка воспроизведения:', e));
+        
+        startAudioVisualization(event.streams[0]);
+      }
+    };
+    
+    // Отправка ICE кандидатов
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log('🧊 Отправляю ICE кандидат');
+        socket.emit('call-ice', { 
+          to: currentCallerId, 
+          candidate: event.candidate 
+        });
+      }
+    };
+    
+    // Отслеживаем изменение состояния соединения
+    peerConnection.onconnectionstatechange = () => {
+      console.log('📡 Состояние соединения:', peerConnection.connectionState);
+      if (peerConnection.connectionState === 'connected') {
+        console.log('✅ WebRTC соединение установлено!');
+      } else if (peerConnection.connectionState === 'failed') {
+        console.error('❌ WebRTC соединение разорвано');
+      }
+    };
+    
+    // Создаем offer
+    const offer = await peerConnection.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: false
+    });
+    
+    await peerConnection.setLocalDescription(offer);
+    console.log('✅ Offer создан и установлен локально');
+    
+    // Отправляем offer другой стороне
+    socket.emit('call-offer', { to: currentCallerId, offer });
+    
+    callInProgress = true;
+    startTimer();
+    showCallWindow('active');
+    
+  } catch(e) {
+    console.error('❌ Ошибка создания offer:', e);
+  }
+}
+
+// Обработка входящего offer
+async function handleOffer(from, offer) {
+  console.log('📨 Обработка offer от:', from);
+  
+  try {
+    // Закрываем старое соединение
+    if (peerConnection) {
+      peerConnection.close();
+    }
+    
     const config = { 
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' }
       ] 
     };
     
-    // Закрываем старое соединение если есть
-    if (peerConnections[from]) {
-      peerConnections[from].close();
-    }
+    peerConnection = new RTCPeerConnection(config);
     
-    const pc = new RTCPeerConnection(config);
-    peerConnections[from] = pc;
-    
-    // Добавляем локальный поток если есть
+    // Добавляем локальный поток
     if (localStream) {
       localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream);
+        console.log('🎙️ Добавляю локальный трек:', track.kind);
+        peerConnection.addTrack(track, localStream);
       });
     }
     
     // Обработка входящего аудио
-    pc.ontrack = (event) => {
-      console.log('🎵 Получен удаленный аудио поток');
+    peerConnection.ontrack = (event) => {
+      console.log('🎵 Получен удаленный аудио поток!');
       if (event.streams && event.streams[0]) {
-        const audio = new Audio();
-        audio.srcObject = event.streams[0];
-        audio.autoplay = true;
-        audio.volume = 1.0;
-        audio.play().catch(e => console.log('Audio error:', e));
+        if (remoteAudioElement) {
+          remoteAudioElement.srcObject = null;
+          remoteAudioElement.remove();
+        }
+        
+        remoteAudioElement = new Audio();
+        remoteAudioElement.srcObject = event.streams[0];
+        remoteAudioElement.autoplay = true;
+        remoteAudioElement.volume = 1.0;
+        
+        remoteAudioElement.play()
+          .then(() => console.log('✅ Удаленное аудио играет!'))
+          .catch(e => console.error('❌ Ошибка воспроизведения:', e));
       }
     };
     
     // Отправка ICE кандидатов
-    pc.onicecandidate = (event) => {
+    peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        socket.emit('call-ice', { to: from, candidate: event.candidate });
+        console.log('🧊 Отправляю ICE кандидат');
+        socket.emit('call-ice', { 
+          to: from, 
+          candidate: event.candidate 
+        });
       }
     };
     
+    peerConnection.onconnectionstatechange = () => {
+      console.log('📡 Состояние соединения:', peerConnection.connectionState);
+    };
+    
     // Устанавливаем удаленный offer
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    console.log('✅ Offer установлен как удаленный');
     
     // Создаем answer
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    console.log('✅ Answer создан');
     
     // Отправляем answer
     socket.emit('call-answer', { to: from, answer });
+    
+    callInProgress = true;
+    startTimer();
+    showCallWindow('active');
     
   } catch(e) {
     console.error('❌ Ошибка обработки offer:', e);
   }
 }
 
-async function handleCallAnswer(from, answer) {
+// Обработка answer
+async function handleAnswer(from, answer) {
   console.log('📨 Обработка answer от:', from);
   
   try {
-    if (peerConnections[from]) {
-      await peerConnections[from].setRemoteDescription(
+    if (peerConnection) {
+      await peerConnection.setRemoteDescription(
         new RTCSessionDescription(answer)
       );
-      console.log('✅ Answer успешно установлен');
-    } else {
-      console.error('❌ Нет peer connection для:', from);
+      console.log('✅ Answer установлен как удаленный');
     }
   } catch(e) {
     console.error('❌ Ошибка обработки answer:', e);
   }
 }
 
-async function handleCallICE(from, candidate) {
+// Обработка ICE кандидатов
+async function handleICE(from, candidate) {
   try {
-    if (peerConnections[from]) {
-      await peerConnections[from].addIceCandidate(
+    if (peerConnection) {
+      await peerConnection.addIceCandidate(
         new RTCIceCandidate(candidate)
       );
+      console.log('✅ ICE кандидат добавлен');
     }
   } catch(e) {
-    console.error('ICE error:', e);
+    console.error('❌ Ошибка ICE:', e);
   }
 }
 
 async function acceptCall() {
-  console.log('📞 Принимаем звонок от:', currentCallerUsername);
+  console.log('📞 Принимаем звонок');
   
   if (!currentCallerId) {
     console.error('❌ Нет ID звонящего');
@@ -1391,10 +1468,9 @@ async function acceptCall() {
   }
 
   stopRingtone();
-  playConnectSound();
 
   try {
-    // Получаем доступ к микрофону если еще нет
+    // Получаем доступ к микрофону
     if (!localStream) {
       localStream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -1405,12 +1481,11 @@ async function acceptCall() {
       });
     }
 
-    // Отправляем сигнал о принятии звонка
+    // Отправляем сигнал о принятии
     socket.emit('call-accept', { to: currentCallerId });
-
-    callInProgress = true;
-    startTimer();
-    showCallWindow('active');
+    
+    // Тот кто принял - создает offer
+    createOffer();
     
   } catch (e) {
     console.error('❌ Ошибка принятия звонка:', e);
@@ -1442,12 +1517,17 @@ function endCall() {
   stopRingtone();
   stopAudioVisualization();
   
-  // Закрываем все соединения
-  for (const id in peerConnections) {
-    try {
-      peerConnections[id].close();
-    } catch(e) {}
-    delete peerConnections[id];
+  // Закрываем peer соединение
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  
+  // Удаляем аудио элемент
+  if (remoteAudioElement) {
+    remoteAudioElement.srcObject = null;
+    remoteAudioElement.remove();
+    remoteAudioElement = null;
   }
   
   // Останавливаем локальный стрим если не в голосовом канале
