@@ -1572,40 +1572,52 @@ async function createOffer() {
 }
 
 async function handleOffer(from, offer) {
-  console.log('📨 Обработка offer');
+  console.log('📨 Обработка offer от:', from);
   try {
+    // Запрашиваем микрофон если его нет
+    if (!localStream) {
+      console.log('🎤 Запрашиваю микрофон в handleOffer...');
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+        });
+        console.log('✅ Микрофон получен, треков:', localStream.getAudioTracks().length);
+      } catch(err) {
+        console.error('❌ Микрофон не получен:', err);
+        alert('Ошибка микрофона: ' + err.message);
+        return;
+      }
+    }
+
     if (peerConnection) peerConnection.close();
     
-    var myPeerConnection = new RTCPeerConnection({
-  iceServers: [
-      {
-        urls: "stun:stun.relay.metered.ca:80",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80",
-        username: "28793b0bc70d6f96e68cd4b2",
-        credential: "Sah/die5lEFpujE2",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80?transport=tcp",
-        username: "28793b0bc70d6f96e68cd4b2",
-        credential: "Sah/die5lEFpujE2",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:443",
-        username: "28793b0bc70d6f96e68cd4b2",
-        credential: "Sah/die5lEFpujE2",
-      },
-      {
-        urls: "turns:global.relay.metered.ca:443?transport=tcp",
-        username: "28793b0bc70d6f96e68cd4b2",
-        credential: "Sah/die5lEFpujE2",
-      },
-  ],
-});
+    peerConnection = new RTCPeerConnection({ 
+      iceServers:[
+        {urls:'stun:stun.l.google.com:19302'},
+        {urls:'stun:stun1.l.google.com:19302'},
+        {
+          urls: 'turn:ca-turn.metered.ca:443?transport=tcp',
+          username: '3cebf846bb9ab8db0a884b07',
+          credential: '7WWBAwbAw52ajcNL'
+        },
+        {
+          urls: 'turn:ca-turn.metered.ca:443?transport=udp',
+          username: '3cebf846bb9ab8db0a884b07',
+          credential: '7WWBAwbAw52ajcNL'
+        }
+      ] 
+    });
     
-    if (localStream) {
-      localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+    if (localStream && localStream.getTracks().length > 0) {
+      console.log('🎵 Добавляю треки в handleOffer:', localStream.getTracks().length);
+      localStream.getTracks().forEach(t => {
+        console.log('  - Добавляю:', t.kind);
+        peerConnection.addTrack(t, localStream);
+      });
+    } else {
+      console.error('❌ Нет треков!');
+      alert('Нет доступа к микрофону');
+      return;
     }
     
     peerConnection.ontrack = (event) => {
@@ -1627,6 +1639,10 @@ async function handleOffer(from, offer) {
       if (e.candidate) socket.emit('call-ice',{to:from,candidate:e.candidate});
     };
     
+    peerConnection.onconnectionstatechange = () => {
+      console.log('📡 Состояние:', peerConnection.connectionState);
+    };
+    
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
@@ -1635,7 +1651,10 @@ async function handleOffer(from, offer) {
     callInProgress = true;
     startTimer();
     showCallWindow('active');
-  } catch(e) { console.error('Handle offer error:', e); }
+  } catch(e) { 
+    console.error('Handle offer error:', e); 
+    alert('Ошибка: ' + e.message);
+  }
 }
 
 async function handleAnswer(from, answer) {
