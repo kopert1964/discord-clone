@@ -1,2 +1,11 @@
 cd C:\Users\user\Desktop\discord-clone
 node server.js
+
+git add public/index.html
+git commit -m "Заменил TURN серверы на OpenRelay"
+git push origin main
+
+Если ветка master:
+
+bash
+git push origin master

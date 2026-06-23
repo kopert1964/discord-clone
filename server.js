@@ -1,470 +1,320 @@
 const express = require('express');
 const http = require('http');
-const socketIO = require('socket.io');
-const Database = require('better-sqlite3');
-const path = require('path');
+const { Server } = require('socket.io');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIO(server, {
-  cors: { origin: "*" },
-  transports: ['websocket', 'polling']
-});
+const io = new Server(server);
 
-app.use(cors());
-app.use(express.json());
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const DATA_DIR = path.join(__dirname, 'data');
+
+// Создаём папки для данных
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+if (!fs.existsSync(path.join(__dirname, 'public', 'uploads'))) {
+  fs.mkdirSync(path.join(__dirname, 'public', 'uploads'), { recursive: true });
+}
+
+// Файлы данных
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const CHANNELS_FILE = path.join(DATA_DIR, 'channels.json');
+const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
+
+// Загружаем данные из файлов
+let users = loadJSON(USERS_FILE, []);
+let channels = loadJSON(CHANNELS_FILE, [
+  { id: 'general', name: '📢 Основной', createdBy: 'system', createdAt: Date.now() },
+  { id: 'random', name: '🎲 Флудилка', createdBy: 'system', createdAt: Date.now() }
+]);
+let messages = loadJSON(MESSAGES_FILE, []);
+
+function loadJSON(file, defaultData) {
+  try {
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) { console.error('Ошибка загрузки:', file, e); }
+  return defaultData;
+}
+
+function saveJSON(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+// Хранилище онлайн-пользователей
+const onlineUsers = new Map(); // socket.id -> { userId, username, status }
+
+// ==================== MIDDLEWARE ====================
 app.use(express.static('public'));
+app.use(express.json());
 
-const db = new Database('/tmp/discord.db');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT,
-    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_online INTEGER DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS servers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    owner_id INTEGER,
-    invite_code TEXT UNIQUE,
-    is_public INTEGER DEFAULT 1
-  );
-
-  CREATE TABLE IF NOT EXISTS channels (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    server_id INTEGER,
-    is_public INTEGER DEFAULT 1,
-    is_voice INTEGER DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    channel_id INTEGER,
-    user_id INTEGER,
-    content TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS members (
-    user_id INTEGER,
-    server_id INTEGER,
-    PRIMARY KEY (user_id, server_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS friends (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    friend_id INTEGER,
-    status TEXT DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, friend_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS private_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    from_user INTEGER,
-    to_user INTEGER,
-    content TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    read INTEGER DEFAULT 0
-  );
-`);
-
-console.log('✅ База данных готова');
-
-const SECRET = 'supersecretkey';
-
-// ========== АУТЕНТИФИКАЦИЯ ==========
-app.post('/register', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const hash = await bcrypt.hash(password, 10);
-    const stmt = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)');
-    const info = stmt.run(username, hash);
-    res.json({ id: info.lastInsertRowid, username });
-  } catch (error) {
-    res.status(400).json({ error: 'Пользователь уже существует' });
-  }
+// Multer для загрузки аватарок
+const storage = multer.diskStorage({
+  destination: path.join(__dirname, 'public', 'uploads'),
+  filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
 });
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB
 
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
-  const user = stmt.get(username);
+// ==================== AUTH ROUTES ====================
+
+// Регистрация
+app.post('/api/register', async (req, res) => {
+  const { username, email, password } = req.body;
   
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(401).json({ error: 'Неверный логин или пароль' });
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: 'Все поля обязательны' });
   }
   
-  db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+  if (users.find(u => u.email === email)) {
+    return res.status(400).json({ error: 'Email уже занят' });
+  }
   
-  const token = jwt.sign({ id: user.id, username: user.username }, SECRET);
-  res.json({ token, user: { id: user.id, username: user.username } });
-});
-
-// ========== ПОЛУЧЕНИЕ СТАТУСА ПОЛЬЗОВАТЕЛЯ ==========
-app.get('/user/status/:userId', (req, res) => {
-  const stmt = db.prepare('SELECT is_online, last_seen FROM users WHERE id = ?');
-  const user = stmt.get(req.params.userId);
-  if (user) {
-    res.json(user);
-  } else {
-    res.status(404).json({ error: 'Пользователь не найден' });
+  if (users.find(u => u.username === username)) {
+    return res.status(400).json({ error: 'Ник уже занят' });
   }
+  
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = {
+    id: uuidv4(),
+    username,
+    email,
+    password: hashedPassword,
+    avatar: null,
+    status: 'online',
+    createdAt: Date.now()
+  };
+  
+  users.push(user);
+  saveJSON(USERS_FILE, users);
+  
+  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, user: { id: user.id, username: user.username, avatar: user.avatar, status: user.status } });
 });
 
-// ========== СЕРВЕРА ==========
-app.post('/servers', (req, res) => {
-  const { name, owner_id } = req.body;
+// Вход
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+  
+  const user = users.find(u => u.email === email);
+  if (!user) return res.status(400).json({ error: 'Неверный email или пароль' });
+  
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) return res.status(400).json({ error: 'Неверный email или пароль' });
+  
+  user.status = 'online';
+  saveJSON(USERS_FILE, users);
+  
+  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, user: { id: user.id, username: user.username, avatar: user.avatar, status: user.status } });
+});
+
+// Проверка токена
+app.get('/api/me', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Нет токена' });
+  
   try {
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const stmt = db.prepare('INSERT INTO servers (name, owner_id, invite_code) VALUES (?, ?, ?)');
-    const info = stmt.run(name, owner_id, inviteCode);
-    const serverId = info.lastInsertRowid;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = users.find(u => u.id === decoded.id);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
     
-    db.prepare('INSERT INTO members (user_id, server_id) VALUES (?, ?)').run(owner_id, serverId);
-    db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
-      .run('💬-общий', serverId, 1, 0);
-    db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)')
-      .run('🔊-Голосовой', serverId, 1, 1);
+    res.json({ user: { id: user.id, username: user.username, avatar: user.avatar, status: user.status } });
+  } catch (e) {
+    res.status(401).json({ error: 'Неверный токен' });
+  }
+});
+
+// Загрузка аватарки
+app.post('/api/avatar', upload.single('avatar'), (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Нет токена' });
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = users.find(u => u.id === decoded.id);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
     
-    res.json({ id: serverId, name, invite_code: inviteCode });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.get('/servers/:userId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT s.* FROM servers s
-    JOIN members m ON m.server_id = s.id
-    WHERE m.user_id = ?
-  `);
-  res.json(stmt.all(req.params.userId));
-});
-
-app.get('/servers/search/:query', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT s.* FROM servers s
-    WHERE s.name LIKE ? AND s.is_public = 1
-    LIMIT 20
-  `);
-  res.json(stmt.all(`%${req.params.query}%`));
-});
-
-app.post('/servers/join', (req, res) => {
-  const { invite_code, user_id } = req.body;
-  try {
-    const stmt = db.prepare('SELECT id FROM servers WHERE invite_code = ?');
-    const server = stmt.get(invite_code);
-    if (!server) {
-      return res.status(404).json({ error: 'Сервер не найден' });
-    }
+    user.avatar = '/uploads/' + req.file.filename;
+    saveJSON(USERS_FILE, users);
     
-    db.prepare('INSERT OR IGNORE INTO members (user_id, server_id) VALUES (?, ?)')
-      .run(user_id, server.id);
-    res.json({ success: true, server_id: server.id });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    io.emit('user-updated', { id: user.id, avatar: user.avatar, username: user.username, status: user.status });
+    res.json({ avatar: user.avatar });
+  } catch (e) {
+    res.status(401).json({ error: 'Неверный токен' });
   }
 });
 
-app.get('/servers/invite/:serverId', (req, res) => {
-  const stmt = db.prepare('SELECT invite_code FROM servers WHERE id = ?');
-  const server = stmt.get(req.params.serverId);
-  if (server) {
-    res.json({ invite_code: server.invite_code });
-  } else {
-    res.status(404).json({ error: 'Сервер не найден' });
-  }
+// Получить список пользователей
+app.get('/api/users', (req, res) => {
+  const usersList = users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar, status: u.status }));
+  res.json(usersList);
 });
 
-// ========== КАНАЛЫ ==========
-app.get('/channels/:serverId', (req, res) => {
-  const stmt = db.prepare('SELECT * FROM channels WHERE server_id = ?');
-  res.json(stmt.all(req.params.serverId));
+// Получить каналы
+app.get('/api/channels', (req, res) => {
+  res.json(channels);
 });
 
-app.post('/channels', (req, res) => {
-  const { name, server_id, is_public, is_voice } = req.body;
+// Создать канал
+app.post('/api/channels', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Нет токена' });
+  
   try {
-    const stmt = db.prepare('INSERT INTO channels (name, server_id, is_public, is_voice) VALUES (?, ?, ?, ?)');
-    const info = stmt.run(name, server_id, is_public || 1, is_voice || 0);
-    res.json({ id: info.lastInsertRowid, name, server_id, is_public: is_public || 1, is_voice: is_voice || 0 });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Название обязательно' });
+    
+    const channel = { id: uuidv4(), name, createdBy: decoded.username, createdAt: Date.now() };
+    channels.push(channel);
+    saveJSON(CHANNELS_FILE, channels);
+    
+    io.emit('channel-created', channel);
+    res.json(channel);
+  } catch (e) {
+    res.status(401).json({ error: 'Неверный токен' });
   }
 });
 
-// ========== СООБЩЕНИЯ ==========
-app.get('/messages/:channelId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT m.*, u.username 
-    FROM messages m
-    JOIN users u ON u.id = m.user_id
-    WHERE m.channel_id = ?
-    ORDER BY m.timestamp ASC LIMIT 100
-  `);
-  res.json(stmt.all(req.params.channelId));
+// Получить сообщения канала
+app.get('/api/messages/:channelId', (req, res) => {
+  const channelMessages = messages.filter(m => m.channelId === req.params.channelId);
+  res.json(channelMessages.slice(-100)); // последние 100 сообщений
 });
 
-// ========== ДРУЗЬЯ ==========
-app.get('/users/search', (req, res) => {
-  const { q } = req.query;
-  const stmt = db.prepare('SELECT id, username, is_online, last_seen FROM users WHERE username LIKE ? LIMIT 10');
-  res.json(stmt.all(`%${q}%`));
-});
-
-app.post('/friends/request', (req, res) => {
-  const { userId, friendId } = req.body;
-  try {
-    const stmt = db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)');
-    stmt.run(userId, friendId, 'pending');
-    res.json({ success: true });
-  } catch (error) {
-    res.status(400).json({ error: 'Заявка уже отправлена' });
-  }
-});
-
-app.post('/friends/accept', (req, res) => {
-  const { userId, friendId } = req.body;
-  const stmt = db.prepare('UPDATE friends SET status = "accepted" WHERE user_id = ? AND friend_id = ?');
-  stmt.run(friendId, userId);
-  res.json({ success: true });
-});
-
-app.get('/friends/:userId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT u.id, u.username, u.is_online, u.last_seen, f.status 
-    FROM friends f
-    JOIN users u ON (u.id = f.friend_id OR u.id = f.user_id)
-    WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted' AND u.id != ?
-  `);
-  res.json(stmt.all(req.params.userId, req.params.userId, req.params.userId));
-});
-
-app.get('/friends/requests/:userId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT u.id, u.username 
-    FROM friends f
-    JOIN users u ON u.id = f.user_id
-    WHERE f.friend_id = ? AND f.status = 'pending'
-  `);
-  res.json(stmt.all(req.params.userId));
-});
-
-// ========== ЛИЧНЫЕ СООБЩЕНИЯ ==========
-app.post('/private/message', (req, res) => {
-  const { from_user, to_user, content } = req.body;
-  try {
-    const stmt = db.prepare('INSERT INTO private_messages (from_user, to_user, content) VALUES (?, ?, ?)');
-    const info = stmt.run(from_user, to_user, content);
-    res.json({ id: info.lastInsertRowid });
-  } catch (error) {
-    res.status(400).json({ error: 'Ошибка отправки' });
-  }
-});
-
-app.get('/private/messages/:userId/:friendId', (req, res) => {
-  const stmt = db.prepare(`
-    SELECT * FROM private_messages 
-    WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
-    ORDER BY timestamp ASC LIMIT 100
-  `);
-  res.json(stmt.all(
-    req.params.userId, req.params.friendId,
-    req.params.friendId, req.params.userId
-  ));
-});
-
-// ========== SOCKET.IO ==========
-const onlineUsers = {};
-const voiceRooms = {};
-
+// ==================== SOCKET.IO ====================
 io.on('connection', (socket) => {
-  console.log('👤 Подключился:', socket.id);
-
-  socket.on('join', ({ userId, username }) => {
-    onlineUsers[socket.id] = { userId, username, socketId: socket.id };
-    db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
-    io.emit('users', Object.values(onlineUsers));
-    console.log(`✅ ${username} онлайн`);
-  });
-
-  socket.on('join-server', (serverId) => {
-    socket.join(`server-${serverId}`);
-  });
-
-  socket.on('join-channel', (channelId) => {
-    socket.join(`channel-${channelId}`);
-  });
-
-  socket.on('message', (data) => {
-    const { channelId, userId, content } = data;
+  console.log('🔌 Подключён:', socket.id);
+  let currentUser = null;
+  
+  // Аутентификация через сокет
+  socket.on('auth', ({ token }) => {
     try {
-      const stmt = db.prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)');
-      const info = stmt.run(channelId, userId, content);
-      
-      const msgStmt = db.prepare(`
-        SELECT m.*, u.username 
-        FROM messages m
-        JOIN users u ON u.id = m.user_id
-        WHERE m.id = ?
-      `);
-      const msg = msgStmt.get(info.lastInsertRowid);
-      io.to(`channel-${channelId}`).emit('message', msg);
-    } catch (error) {
-      console.error('Ошибка сообщения:', error);
-    }
-  });
-
-  socket.on('private-message', (data) => {
-    const { from_user, to_user, content, to_socket_id } = data;
-    try {
-      const stmt = db.prepare('INSERT INTO private_messages (from_user, to_user, content) VALUES (?, ?, ?)');
-      const info = stmt.run(from_user, to_user, content);
-      
-      const msgStmt = db.prepare(`SELECT * FROM private_messages WHERE id = ?`);
-      const msg = msgStmt.get(info.lastInsertRowid);
-      
-      if (to_socket_id) {
-        io.to(to_socket_id).emit('private-message', { ...msg, from_user, to_user });
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = users.find(u => u.id === decoded.id);
+      if (user) {
+        currentUser = user;
+        onlineUsers.set(socket.id, { userId: user.id, username: user.username, status: 'online' });
+        
+        user.status = 'online';
+        saveJSON(USERS_FILE, users);
+        
+        io.emit('user-status', { id: user.id, status: 'online' });
+        console.log(`✅ ${user.username} вошёл`);
       }
-      socket.emit('private-message-sent', msg);
-    } catch (error) {
-      console.error('Ошибка личного сообщения:', error);
+    } catch (e) {
+      console.log('❌ Неверный токен сокета');
     }
   });
-
-  // ===== ИНДИКАТОР ПЕЧАТАЕТ =====
-  socket.on('typing-start', ({ channelId, username }) => {
-    socket.to(`channel-${channelId}`).emit('user-typing', { username });
+  
+  // Отправка сообщения
+  socket.on('send-message', ({ channelId, text }) => {
+    if (!currentUser || !text?.trim()) return;
+    
+    const message = {
+      id: uuidv4(),
+      channelId,
+      userId: currentUser.id,
+      username: currentUser.username,
+      avatar: currentUser.avatar,
+      text: text.trim(),
+      edited: false,
+      createdAt: Date.now()
+    };
+    
+    messages.push(message);
+    if (messages.length > 10000) messages = messages.slice(-5000); // Ограничение размера
+    saveJSON(MESSAGES_FILE, messages);
+    
+    io.emit('new-message', message);
   });
-
-  socket.on('typing-stop', ({ channelId }) => {
-    socket.to(`channel-${channelId}`).emit('user-stop-typing');
-  });
-
-  socket.on('private-typing-start', ({ to_socket_id, username }) => {
-    if (to_socket_id) {
-      io.to(to_socket_id).emit('private-user-typing', { username });
+  
+  // Редактирование сообщения
+  socket.on('edit-message', ({ messageId, text }) => {
+    const msg = messages.find(m => m.id === messageId && m.userId === currentUser?.id);
+    if (msg && text?.trim()) {
+      msg.text = text.trim();
+      msg.edited = true;
+      saveJSON(MESSAGES_FILE, messages);
+      io.emit('message-edited', { messageId, text: msg.text, edited: true });
     }
   });
-
-  socket.on('private-typing-stop', ({ to_socket_id }) => {
-    if (to_socket_id) {
-      io.to(to_socket_id).emit('private-user-stop-typing');
+  
+  // Удаление сообщения
+  socket.on('delete-message', ({ messageId }) => {
+    const msg = messages.find(m => m.id === messageId && m.userId === currentUser?.id);
+    if (msg) {
+      messages = messages.filter(m => m.id !== messageId);
+      saveJSON(MESSAGES_FILE, messages);
+      io.emit('message-deleted', { messageId });
     }
   });
-
-  // ===== ГОЛОСОВЫЕ КАНАЛЫ =====
-  socket.on('voice-join', ({ channelId, serverId, userId, username }) => {
-    const roomName = `voice-${channelId}`;
-    socket.join(roomName);
-    
-    if (!voiceRooms[roomName]) {
-      voiceRooms[roomName] = [];
-    }
-    
-    voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
-    voiceRooms[roomName].push({ userId, username, socketId: socket.id });
-    
-    io.to(roomName).emit('voice-users', voiceRooms[roomName]);
-    
-    console.log(`🎤 ${username} вошёл в голосовой канал ${channelId}`);
+  
+  // Смена статуса
+  socket.on('set-status', ({ status }) => {
+    if (!currentUser) return;
+    currentUser.status = status;
+    saveJSON(USERS_FILE, users);
+    io.emit('user-status', { id: currentUser.id, status });
   });
-
-  socket.on('voice-leave', ({ channelId, userId }) => {
-    const roomName = `voice-${channelId}`;
-    socket.leave(roomName);
-    
-    if (voiceRooms[roomName]) {
-      voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== userId);
-      io.to(roomName).emit('voice-users', voiceRooms[roomName]);
-      
-      if (voiceRooms[roomName].length === 0) {
-        delete voiceRooms[roomName];
-      }
-    }
-  });
-
-  socket.on('voice-offer', ({ to, offer }) => {
-    io.to(to).emit('voice-offer', { from: socket.id, offer });
-  });
-
-  socket.on('voice-answer', ({ to, answer }) => {
-    io.to(to).emit('voice-answer', { from: socket.id, answer });
-  });
-
-  socket.on('voice-ice', ({ to, candidate }) => {
-    io.to(to).emit('voice-ice', { from: socket.id, candidate });
-  });
-
-  // ===== ЛИЧНЫЕ ЗВОНКИ =====
-  socket.on('call-user', ({ to, fromUsername }) => {
-    io.to(to).emit('incoming-call', {
-      from: socket.id,
-      fromUsername: fromUsername || 'Неизвестный'
-    });
-  });
-
-  socket.on('call-accept', ({ to }) => {
-    io.to(to).emit('call-connected', { from: socket.id });
-  });
-
-  socket.on('call-reject', ({ to }) => {
-    io.to(to).emit('call-rejected', { from: socket.id });
-  });
-
-  socket.on('call-end', ({ to }) => {
-    io.to(to).emit('call-ended', { from: socket.id });
-  });
-
+  
+  // ==================== ЗВОНКИ (твой текущий код) ====================
   socket.on('call-offer', ({ to, offer }) => {
-    io.to(to).emit('call-offer', { from: socket.id, offer });
-  });
-
-  socket.on('call-answer', ({ to, answer }) => {
-    io.to(to).emit('call-answer', { from: socket.id, answer });
-  });
-
-  socket.on('call-ice', ({ to, candidate }) => {
-    io.to(to).emit('call-ice', { from: socket.id, candidate });
-  });
-
-  socket.on('disconnect', () => {
-    const user = onlineUsers[socket.id];
-    if (user) {
-      console.log(`❌ ${user.username} вышел`);
-      
-      db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.userId);
-      
-      for (const roomName in voiceRooms) {
-        voiceRooms[roomName] = voiceRooms[roomName].filter(u => u.userId !== user.userId);
-        io.to(roomName).emit('voice-users', voiceRooms[roomName]);
-        if (voiceRooms[roomName].length === 0) {
-          delete voiceRooms[roomName];
-        }
-      }
+    const targetSocket = findSocketByUserId(to);
+    if (targetSocket) {
+      targetSocket.emit('call-offer', { from: currentUser?.id, offer, callerName: currentUser?.username });
     }
-    delete onlineUsers[socket.id];
-    io.emit('users', Object.values(onlineUsers));
+  });
+  
+  socket.on('call-answer', ({ to, answer }) => {
+    const targetSocket = findSocketByUserId(to);
+    if (targetSocket) targetSocket.emit('call-answer', { from: currentUser?.id, answer });
+  });
+  
+  socket.on('call-ice', ({ to, candidate }) => {
+    const targetSocket = findSocketByUserId(to);
+    if (targetSocket) targetSocket.emit('call-ice', { from: currentUser?.id, candidate });
+  });
+  
+  socket.on('call-accept', ({ to }) => {
+    const targetSocket = findSocketByUserId(to);
+    if (targetSocket) targetSocket.emit('call-accepted', { from: currentUser?.id });
+  });
+  
+  socket.on('call-reject', ({ to }) => {
+    const targetSocket = findSocketByUserId(to);
+    if (targetSocket) targetSocket.emit('call-rejected', { from: currentUser?.id });
+  });
+  
+  socket.on('call-end', ({ to }) => {
+    const targetSocket = findSocketByUserId(to);
+    if (targetSocket) targetSocket.emit('call-ended', { from: currentUser?.id });
+  });
+  
+  function findSocketByUserId(userId) {
+    for (let [sid, data] of onlineUsers) {
+      if (data.userId === userId) return io.sockets.sockets.get(sid);
+    }
+    return null;
+  }
+  
+  // Отключение
+  socket.on('disconnect', () => {
+    console.log('🔌 Отключён:', socket.id);
+    if (currentUser) {
+      currentUser.status = 'offline';
+      saveJSON(USERS_FILE, users);
+      onlineUsers.delete(socket.id);
+      io.emit('user-status', { id: currentUser.id, status: 'offline' });
+    }
   });
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-const port = process.env.PORT || 3000;
-server.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 Сервер запущен на порту ${port}`);
+server.listen(PORT, () => {
+  console.log(`🚀 Сервер на порту ${PORT}`);
 });
