@@ -1483,7 +1483,20 @@ async function startCall(socketId, username) {
 
 async function createOffer() {
   console.log('📤 Создаю WebRTC offer');
-  try {
+   if (!localStream) {
+    console.error('❌ localStream отсутствует, запрашиваю заново');
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+      });
+    } catch(e) {
+      console.error('Не могу получить микрофон:', e);
+      alert('Нет доступа к микрофону');
+      endCall();
+      return;
+    }
+  }
+   try {
     if (peerConnection) peerConnection.close();
     
     var myPeerConnection = new RTCPeerConnection({
@@ -1642,16 +1655,27 @@ async function acceptCall() {
   playConnectSound();
   
   try {
-    if (!localStream) {
-      localStream = await navigator.mediaDevices.getUserMedia({ 
-        audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } 
-      });
-    }
-    socket.emit('call-accept',{to:currentCallerId});
-    createOffer();
+    // ВСЕГДА запрашиваем микрофон заново
+    console.log('🎤 Запрашиваю микрофон...');
+    localStream = await navigator.mediaDevices.getUserMedia({ 
+      audio: { 
+        echoCancellation: true, 
+        noiseSuppression: true, 
+        autoGainControl: true 
+      } 
+    });
+    console.log('✅ Микрофон получен, треки:', localStream.getAudioTracks().length);
+    
+    socket.emit('call-accept', { to: currentCallerId });
+    
+    // Небольшая задержка чтобы сигнал успел дойти
+    setTimeout(() => {
+      createOffer();
+    }, 300);
+    
   } catch(e) {
     console.error('Accept error:', e);
-    alert('❌ Ошибка: ' + e.message);
+    alert('❌ Ошибка доступа к микрофону: ' + e.message);
     endCall();
   }
 }
