@@ -35,398 +35,275 @@
       flex-direction: column;
     }
     
-    /* АНИМАЦИИ */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    
     @keyframes slideInLeft {
       from { opacity: 0; transform: translateX(-20px); }
       to { opacity: 1; transform: translateX(0); }
     }
-    
     @keyframes slideInRight {
       from { opacity: 0; transform: translateX(20px); }
       to { opacity: 1; transform: translateX(0); }
     }
-    
     @keyframes pulse {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.05); }
     }
-    
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-5px); }
-      75% { transform: translateX(5px); }
-    }
-    
     @keyframes bounceIn {
       0% { transform: scale(0.3); opacity: 0; }
       50% { transform: scale(1.05); }
       70% { transform: scale(0.9); }
       100% { transform: scale(1); opacity: 1; }
     }
-    
-    @keyframes typing {
-      0% { opacity: 0.3; }
-      50% { opacity: 1; }
-      100% { opacity: 0.3; }
-    }
-    
     .fade-in { animation: fadeIn 0.3s ease forwards; }
     .slide-in-left { animation: slideInLeft 0.3s ease forwards; }
     .slide-in-right { animation: slideInRight 0.3s ease forwards; }
     .bounce-in { animation: bounceIn 0.4s ease forwards; }
     
-    /* АВТОРИЗАЦИЯ */
     #auth-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.8); z-index: 9999;
       display: flex; align-items: center; justify-content: center;
     }
-    
     #auth-box {
-      background: var(--bg-secondary); padding: 40px;
-      border-radius: var(--radius); width: 400px; max-width: 90%;
-      box-shadow: var(--shadow); animation: bounceIn 0.5s ease;
+      background: var(--bg-secondary); padding: 40px; border-radius: var(--radius);
+      width: 400px; max-width: 90%; box-shadow: var(--shadow); animation: bounceIn 0.5s ease;
     }
-    
-    #auth-box h2 {
-      text-align: center; margin-bottom: 24px; color: var(--accent); font-size: 24px;
-    }
-    
+    #auth-box h2 { text-align: center; margin-bottom: 24px; color: var(--accent); font-size: 24px; }
     #auth-box input {
       width: 100%; padding: 12px 16px; margin-bottom: 12px;
       background: var(--bg-primary); border: 2px solid var(--border);
       border-radius: 8px; color: var(--text-primary); font-size: 14px;
       transition: var(--transition); outline: none;
     }
-    
-    #auth-box input:focus {
-      border-color: var(--accent);
-    }
-    
+    #auth-box input:focus { border-color: var(--accent); }
     #auth-box button {
-      width: 100%; padding: 12px; background: var(--accent);
-      color: white; border: none; border-radius: 8px; font-size: 16px;
-      font-weight: 600; cursor: pointer; transition: var(--transition);
+      width: 100%; padding: 12px; background: var(--accent); color: white;
+      border: none; border-radius: 8px; font-size: 16px; font-weight: 600;
+      cursor: pointer; transition: var(--transition);
     }
-    
     #auth-box button:hover { background: var(--accent-hover); transform: translateY(-2px); }
-    
     #auth-toggle { text-align: center; margin-top: 12px; color: var(--text-secondary); cursor: pointer; font-size: 14px; }
     #auth-toggle span { color: var(--accent); text-decoration: underline; }
-    
     .auth-error { color: var(--danger); text-align: center; margin-bottom: 12px; font-size: 14px; min-height: 20px; }
     
-    /* ОСНОВНОЙ ИНТЕРФЕЙС */
-    #app {
-      display: flex; height: 100vh; opacity: 0; transition: opacity 0.3s;
-    }
-    
+    #app { display: flex; height: 100vh; opacity: 0; transition: opacity 0.3s; }
     #app.visible { opacity: 1; }
     
-    /* САЙДБАР */
     #sidebar {
       width: 260px; background: var(--bg-secondary); display: flex;
-      flex-direction: column; border-right: 1px solid var(--border);
-      animation: slideInLeft 0.4s ease;
+      flex-direction: column; border-right: 1px solid var(--border); animation: slideInLeft 0.4s ease;
     }
-    
     #sidebar-header {
       padding: 20px; border-bottom: 1px solid var(--border);
       font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px;
     }
     
-    #channels-list {
-      flex: 1; overflow-y: auto; padding: 8px;
+    .section-title {
+      font-size: 11px; text-transform: uppercase; color: var(--text-secondary);
+      padding: 12px 16px 4px; letter-spacing: 1px;
     }
+    #channels-list { overflow-y: auto; padding: 0 8px; }
+    #voice-channels-list { overflow-y: auto; padding: 0 8px; }
     
-    .channel-item {
+    .channel-item, .voice-channel-item {
       padding: 10px 16px; margin: 2px 0; border-radius: 8px;
       cursor: pointer; transition: var(--transition); display: flex;
       align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary);
     }
-    
-    .channel-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .channel-item:hover, .voice-channel-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
     .channel-item.active { background: var(--accent); color: white; font-weight: 600; }
+    .voice-channel-item.active { background: #1a5c3a; color: var(--success); font-weight: 600; }
     
     #add-channel {
-      padding: 10px 16px; margin: 8px; border-radius: 8px;
-      cursor: pointer; background: transparent; border: 2px dashed var(--border);
-      color: var(--text-secondary); text-align: center; font-size: 13px;
-      transition: var(--transition);
+      padding: 10px 16px; margin: 8px; border-radius: 8px; cursor: pointer;
+      background: transparent; border: 2px dashed var(--border);
+      color: var(--text-secondary); text-align: center; font-size: 13px; transition: var(--transition);
     }
-    
     #add-channel:hover { border-color: var(--accent); color: var(--accent); }
     
-    /* ПРОФИЛЬ В САЙДБАРЕ */
     #sidebar-profile {
       padding: 16px; border-top: 1px solid var(--border); display: flex;
       align-items: center; gap: 12px; cursor: pointer; transition: var(--transition);
     }
-    
     #sidebar-profile:hover { background: var(--bg-tertiary); }
-    
     #sidebar-avatar {
       width: 40px; height: 40px; border-radius: 50%; background: var(--accent);
       display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 16px; color: white; position: relative;
-      overflow: hidden; flex-shrink: 0;
+      overflow: hidden; flex-shrink: 0; cursor: pointer;
     }
+    #sidebar-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    #sidebar-username { font-weight: 600; font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     
-    #sidebar-avatar img {
-      width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
-    }
-    
-    .status-dot {
-      position: absolute; bottom: 0; right: 0; width: 12px; height: 12px;
-      border-radius: 50%; border: 2px solid var(--bg-secondary);
-    }
-    
-    .status-dot.online { background: var(--success); }
-    .status-dot.idle { background: var(--warning); }
-    .status-dot.dnd { background: var(--danger); }
-    .status-dot.offline { background: #666; }
-    
-    #sidebar-username {
-      font-weight: 600; font-size: 14px; flex: 1; overflow: hidden;
-      text-overflow: ellipsis; white-space: nowrap;
-    }
-    
-    /* ОСНОВНАЯ ОБЛАСТЬ */
-    #main {
-      flex: 1; display: flex; flex-direction: column; background: var(--bg-primary);
-    }
-    
+    #main { flex: 1; display: flex; flex-direction: column; background: var(--bg-primary); }
     #chat-header {
       padding: 16px 24px; border-bottom: 1px solid var(--border);
       font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px;
     }
-    
-    #messages {
-      flex: 1; overflow-y: auto; padding: 16px 24px; display: flex;
-      flex-direction: column; gap: 4px;
-    }
+    #messages { flex: 1; overflow-y: auto; padding: 16px 24px; display: flex; flex-direction: column; gap: 4px; }
     
     .message {
       display: flex; gap: 12px; padding: 8px 12px; border-radius: 8px;
-      transition: var(--transition); animation: fadeIn 0.2s ease;
-      position: relative;
+      transition: var(--transition); animation: fadeIn 0.2s ease; position: relative;
     }
-    
     .message:hover { background: rgba(255,255,255,0.03); }
-    
-    .message.highlight {
-      animation: pulse 0.6s ease;
-      background: rgba(108, 99, 255, 0.15);
-    }
-    
     .message-avatar {
       width: 40px; height: 40px; border-radius: 50%; background: var(--accent);
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 14px; color: white; flex-shrink: 0;
-      overflow: hidden;
+      font-weight: 700; font-size: 14px; color: white; flex-shrink: 0; overflow: hidden;
     }
-    
-    .message-avatar img {
-      width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
-    }
-    
+    .message-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     .message-content { flex: 1; }
-    
-    .message-header {
-      display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
-    }
-    
+    .message-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
     .message-username { font-weight: 600; font-size: 14px; }
     .message-time { font-size: 11px; color: var(--text-secondary); }
     .message-edited { font-size: 10px; color: var(--text-secondary); font-style: italic; }
-    
     .message-text { font-size: 14px; line-height: 1.5; word-break: break-word; }
-    
     .message-actions {
       position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
       display: none; gap: 4px; background: var(--bg-secondary);
       border-radius: 6px; padding: 4px; box-shadow: var(--shadow);
     }
-    
     .message:hover .message-actions { display: flex; }
-    
     .message-actions button {
       background: none; border: none; color: var(--text-secondary);
-      cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px;
-      transition: var(--transition);
+      cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px; transition: var(--transition);
     }
-    
     .message-actions button:hover { color: var(--text-primary); background: var(--bg-tertiary); }
     
-    /* ВВОД СООБЩЕНИЯ */
-    #input-area {
-      padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 12px;
-    }
-    
+    #input-area { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 12px; }
     #message-input {
       flex: 1; padding: 12px 16px; background: var(--bg-secondary);
       border: 2px solid var(--border); border-radius: 8px;
       color: var(--text-primary); font-size: 14px; resize: none;
       outline: none; font-family: inherit; transition: var(--transition);
     }
-    
     #message-input:focus { border-color: var(--accent); }
-    
-    #send-btn, #call-btn {
+    #send-btn {
       padding: 12px 20px; background: var(--accent); color: white;
       border: none; border-radius: 8px; cursor: pointer; font-weight: 600;
       font-size: 14px; transition: var(--transition); white-space: nowrap;
     }
+    #send-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
     
-    #send-btn:hover, #call-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
-    
-    /* СПИСОК ПОЛЬЗОВАТЕЛЕЙ */
     #users-panel {
-      width: 220px; background: var(--bg-secondary); border-left: 1px solid var(--border);
+      width: 240px; background: var(--bg-secondary); border-left: 1px solid var(--border);
       padding: 16px; overflow-y: auto; animation: slideInRight 0.4s ease;
     }
-    
-    #users-panel h3 {
-      font-size: 12px; text-transform: uppercase; color: var(--text-secondary);
-      margin-bottom: 12px; letter-spacing: 1px;
-    }
-    
+    #users-panel h3 { font-size: 12px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px; letter-spacing: 1px; }
     .user-item {
-      display: flex; align-items: center; gap: 10px; padding: 8px;
-      border-radius: 8px; cursor: pointer; transition: var(--transition);
-      margin-bottom: 4px;
+      display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px;
+      cursor: pointer; transition: var(--transition); margin-bottom: 4px;
     }
-    
     .user-item:hover { background: var(--bg-tertiary); }
-    
     .user-item-avatar {
       width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
       display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; color: white; position: relative;
-      overflow: hidden; flex-shrink: 0;
+      font-size: 12px; font-weight: 700; color: white; position: relative; overflow: hidden; flex-shrink: 0;
     }
-    
-    .user-item-avatar img {
-      width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+    .user-item-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .status-dot {
+      position: absolute; bottom: 0; right: 0; width: 10px; height: 10px;
+      border-radius: 50%; border: 2px solid var(--bg-secondary);
     }
-    
+    .status-dot.online { background: var(--success); }
+    .status-dot.idle { background: var(--warning); }
+    .status-dot.dnd { background: var(--danger); }
+    .status-dot.offline { background: #666; }
     .user-item-name { font-size: 13px; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-item-call {
+      background: var(--success); color: white; border: none; border-radius: 50%;
+      width: 28px; height: 28px; cursor: pointer; font-size: 14px; transition: var(--transition);
+      display: none; align-items: center; justify-content: center;
+    }
+    .user-item:hover .user-item-call { display: flex; }
+    .user-item-call:hover { transform: scale(1.1); }
     
-    /* ОКНО ЗВОНКА */
     #call-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.9); z-index: 9998; display: none;
       align-items: center; justify-content: center; flex-direction: column;
     }
-    
     #call-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
-    
     #call-window {
       background: var(--bg-secondary); padding: 40px; border-radius: var(--radius);
       text-align: center; box-shadow: var(--shadow); animation: bounceIn 0.4s ease;
     }
-    
     #call-window h3 { margin-bottom: 16px; font-size: 20px; }
     #call-timer { font-size: 32px; font-weight: 700; margin: 16px 0; color: var(--accent); }
-    
     #call-voice-indicator {
       width: 80px; height: 80px; border-radius: 50%; background: var(--bg-tertiary);
-      margin: 16px auto; display: flex; align-items: center; justify-content: center;
-      font-size: 32px; transition: var(--transition);
+      margin: 16px auto; display: flex; align-items: center; justify-content: center; font-size: 32px;
     }
-    
-    #call-voice-indicator.speaking {
-      background: var(--accent); box-shadow: 0 0 20px var(--accent);
-      animation: pulse 1.5s infinite;
-    }
-    
     .call-buttons { display: flex; gap: 12px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
-    
     .call-buttons button {
       padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer;
       font-weight: 600; font-size: 14px; transition: var(--transition);
     }
-    
     .btn-end { background: var(--danger); color: white; }
     .btn-end:hover { background: #c0392b; transform: scale(1.05); }
     .btn-mute { background: var(--bg-tertiary); color: var(--text-primary); }
-    .btn-mute:hover { background: #1a1a3e; }
     .btn-mute.muted { background: var(--warning); color: black; }
     
-    /* УВЕДОМЛЕНИЯ */
+    #status-modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); z-index: 10001; display: none;
+      align-items: center; justify-content: center;
+    }
+    #status-modal.active { display: flex; animation: fadeIn 0.2s ease; }
+    #status-modal-content {
+      background: var(--bg-secondary); padding: 24px; border-radius: var(--radius);
+      box-shadow: var(--shadow); width: 300px;
+    }
+    #status-modal-content h3 { margin-bottom: 16px; text-align: center; }
+    .status-option {
+      padding: 12px 16px; margin: 4px 0; border-radius: 8px; cursor: pointer;
+      transition: var(--transition); display: flex; align-items: center; gap: 10px;
+    }
+    .status-option:hover { background: var(--bg-tertiary); }
+    
     #notification {
       position: fixed; top: 20px; right: 20px; background: var(--bg-secondary);
       padding: 16px 24px; border-radius: var(--radius); box-shadow: var(--shadow);
       z-index: 10000; transform: translateX(120%); transition: transform 0.3s ease;
       display: flex; align-items: center; gap: 12px;
     }
-    
-    #notification.show { transform: translateX(0); animation: shake 0.5s ease; }
-    
+    #notification.show { transform: translateX(0); }
     #notification-avatar {
       width: 40px; height: 40px; border-radius: 50%; background: var(--accent);
       display: flex; align-items: center; justify-content: center; font-weight: 700;
       color: white; overflow: hidden; flex-shrink: 0;
     }
-    
-    #notification-avatar img {
-      width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
-    }
-    
+    #notification-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     #notification-text { font-size: 14px; }
     #notification-text strong { color: var(--accent); }
     
-    /* МОДАЛЬНОЕ ОКНО СТАТУСА */
-    #status-modal {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6); z-index: 10001; display: none;
-      align-items: center; justify-content: center;
-    }
-    
-    #status-modal.active { display: flex; animation: fadeIn 0.2s ease; }
-    
-    #status-modal-content {
-      background: var(--bg-secondary); padding: 24px; border-radius: var(--radius);
-      box-shadow: var(--shadow); width: 300px;
-    }
-    
-    #status-modal-content h3 { margin-bottom: 16px; text-align: center; }
-    
-    .status-option {
-      padding: 12px 16px; margin: 4px 0; border-radius: 8px; cursor: pointer;
-      transition: var(--transition); display: flex; align-items: center; gap: 10px;
-    }
-    
-    .status-option:hover { background: var(--bg-tertiary); }
-    
-    /* СКРОЛЛБАР */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
     
-    /* МОБИЛЬНАЯ АДАПТАЦИЯ */
     @media (max-width: 768px) {
       #sidebar { width: 60px; }
       #sidebar-header { font-size: 0; justify-content: center; padding: 16px 8px; }
       #sidebar-header::after { content: '📱'; font-size: 20px; }
-      .channel-item { padding: 10px; justify-content: center; font-size: 0; }
-      .channel-item::after { content: attr(data-icon); font-size: 18px; }
+      .channel-item, .voice-channel-item { padding: 10px; justify-content: center; font-size: 0; }
+      .channel-item::after { content: '#'; font-size: 18px; }
+      .voice-channel-item::after { content: '🔊'; font-size: 18px; }
+      .section-title { display: none; }
       #sidebar-username { display: none; }
       #users-panel { display: none; }
       #input-area { padding: 8px; gap: 8px; }
       #message-input { font-size: 13px; }
-      #send-btn, #call-btn { padding: 10px 14px; font-size: 12px; }
+      #send-btn { padding: 10px 14px; font-size: 12px; }
     }
   </style>
 </head>
 <body>
-    <!-- АВТОРИЗАЦИЯ -->
+  <!-- АВТОРИЗАЦИЯ -->
   <div id="auth-overlay">
     <div id="auth-box">
       <h2>🚀 Вход</h2>
@@ -441,34 +318,34 @@
 
   <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
   <div id="app">
-    <!-- САЙДБАР -->
     <div id="sidebar">
       <div id="sidebar-header">💬 Discord Clone</div>
+      <div class="section-title">Текстовые каналы</div>
       <div id="channels-list"></div>
       <div id="add-channel">+ Создать канал</div>
+      <div class="section-title">Голосовые каналы</div>
+      <div id="voice-channels-list"></div>
       <div id="sidebar-profile">
-        <div id="sidebar-avatar">
+        <div id="sidebar-avatar" onclick="document.getElementById('avatar-input').click()" title="Сменить аватар">
           <span id="sidebar-avatar-text">?</span>
         </div>
         <span id="sidebar-username"></span>
         <span style="font-size:12px;color:var(--text-secondary)">▼</span>
+        <input type="file" id="avatar-input" accept="image/*" style="display:none" onchange="uploadAvatar(event)">
       </div>
     </div>
 
-    <!-- ЧАТ -->
     <div id="main">
       <div id="chat-header">📢 Основной</div>
       <div id="messages"></div>
       <div id="input-area">
-        <button id="call-btn">📞 Звонок</button>
         <input type="text" id="message-input" placeholder="Введите сообщение..." maxlength="2000">
         <button id="send-btn">➤</button>
       </div>
     </div>
 
-    <!-- ПОЛЬЗОВАТЕЛИ -->
     <div id="users-panel">
-      <h3>👥 Онлайн</h3>
+      <h3>👥 Пользователи</h3>
       <div id="users-list"></div>
     </div>
   </div>
@@ -514,8 +391,10 @@
   let currentUser = null;
   let token = localStorage.getItem('token');
   let currentChannel = 'general';
+  let currentDM = null; // id пользователя для ЛС
   let users = [];
   let channels = [];
+  let voiceChannels = [];
   
   // Звонки
   let peerConnection;
@@ -526,6 +405,10 @@
   let callSeconds = 0;
   let callTimerInterval;
   let isMuted = false;
+  
+  // Голосовой канал
+  let currentVoiceChannel = null;
+  let voicePeerConnections = {}; // userId -> RTCPeerConnection
   
   // DOM элементы
   const authOverlay = document.getElementById('auth-overlay');
@@ -538,6 +421,7 @@
   const authToggle = document.getElementById('auth-toggle');
   const appEl = document.getElementById('app');
   const channelsList = document.getElementById('channels-list');
+  const voiceChannelsList = document.getElementById('voice-channels-list');
   const chatHeader = document.getElementById('chat-header');
   const messagesEl = document.getElementById('messages');
   const messageInput = document.getElementById('message-input');
@@ -549,21 +433,17 @@
   
   let isLogin = true;
   
-  // ==================== ЗВУКИ УВЕДОМЛЕНИЙ ====================
-  // Создаём простой звук через AudioContext
+  // ==================== ЗВУКИ ====================
   function playNotificationSound() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.connect(g);
-      g.connect(ctx.destination);
-      o.type = 'sine';
-      g.gain.value = 0.1;
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sine'; g.gain.value = 0.1;
       o.frequency.setValueAtTime(800, ctx.currentTime);
       o.frequency.setValueAtTime(1000, ctx.currentTime + 0.1);
-      o.start(ctx.currentTime);
-      o.stop(ctx.currentTime + 0.2);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.2);
     } catch(e) {}
   }
   
@@ -572,15 +452,38 @@
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.connect(g);
-      g.connect(ctx.destination);
-      o.type = 'square';
-      g.gain.value = 0.08;
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'square'; g.gain.value = 0.08;
       o.frequency.setValueAtTime(440, ctx.currentTime);
       o.frequency.setValueAtTime(660, ctx.currentTime + 0.15);
       o.frequency.setValueAtTime(880, ctx.currentTime + 0.3);
-      o.start(ctx.currentTime);
-      o.stop(ctx.currentTime + 0.5);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.5);
+    } catch(e) {}
+  }
+  
+  function playJoinSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sine'; g.gain.value = 0.05;
+      o.frequency.setValueAtTime(600, ctx.currentTime);
+      o.frequency.setValueAtTime(900, ctx.currentTime + 0.15);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.3);
+    } catch(e) {}
+  }
+  
+  function playLeaveSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sine'; g.gain.value = 0.05;
+      o.frequency.setValueAtTime(900, ctx.currentTime);
+      o.frequency.setValueAtTime(600, ctx.currentTime + 0.15);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.3);
     } catch(e) {}
   }
   
@@ -639,14 +542,13 @@
     authError.textContent = '';
   });
   
-  // Вход по Enter
   [authUsername, authEmail, authPassword].forEach(el => {
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') authSubmit.click();
     });
   });
   
-  // ==================== ПРОВЕРКА ТОКЕНА ПРИ ЗАГРУЗКЕ ====================
+  // ==================== ПРОВЕРКА ТОКЕНА ====================
   async function checkToken() {
     if (!token) {
       authOverlay.style.display = 'flex';
@@ -678,26 +580,16 @@
   async function initApp() {
     appEl.classList.add('visible');
     
-    // Подключаем сокет
     socket = io();
     socket.emit('auth', { token });
     
-    // Загружаем каналы
     await loadChannels();
-    
-    // Загружаем пользователей
+    await loadVoiceChannels();
     await loadUsers();
-    
-    // Загружаем сообщения текущего канала
     await loadMessages(currentChannel);
     
-    // Обновляем профиль в сайдбаре
     updateSidebarProfile();
-    
-    // События сокета
     setupSocketEvents();
-    
-    // Обработчики UI
     setupUIEvents();
   }
   
@@ -707,16 +599,15 @@
       const res = await fetch('/api/channels');
       channels = await res.json();
       renderChannels();
-    } catch(e) { console.error('Ошибка загрузки каналов:', e); }
+    } catch(e) { console.error(e); }
   }
   
   function renderChannels() {
     channelsList.innerHTML = '';
     channels.forEach(ch => {
       const div = document.createElement('div');
-      div.className = 'channel-item' + (ch.id === currentChannel ? ' active' : '');
+      div.className = 'channel-item' + (ch.id === currentChannel && !currentDM ? ' active' : '');
       div.textContent = ch.name;
-      div.setAttribute('data-icon', ch.name.slice(0, 2));
       div.addEventListener('click', () => switchChannel(ch.id));
       channelsList.appendChild(div);
     });
@@ -724,37 +615,106 @@
   
   async function switchChannel(channelId) {
     currentChannel = channelId;
+    currentDM = null;
     const ch = channels.find(c => c.id === channelId);
     if (ch) chatHeader.textContent = ch.name;
     renderChannels();
+    document.querySelectorAll('.voice-channel-item').forEach(el => el.classList.remove('active'));
     await loadMessages(channelId);
   }
   
-  // Создание канала
-  document.getElementById('add-channel').addEventListener('click', () => {
-    const name = prompt('Название канала:');
-    if (!name?.trim()) return;
-    
-    fetch('/api/channels', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ name: name.trim() })
-    }).then(() => loadChannels());
-  });
+  // ==================== ГОЛОСОВЫЕ КАНАЛЫ ====================
+  async function loadVoiceChannels() {
+    try {
+      const res = await fetch('/api/voice-channels');
+      voiceChannels = await res.json();
+      renderVoiceChannels();
+    } catch(e) { console.error(e); }
+  }
   
-  // ==================== ЗАГРУЗКА ПОЛЬЗОВАТЕЛЕЙ ====================
+  function renderVoiceChannels() {
+    voiceChannelsList.innerHTML = '';
+    voiceChannels.forEach(vc => {
+      const div = document.createElement('div');
+      div.className = 'voice-channel-item' + (currentVoiceChannel === vc.id ? ' active' : '');
+      div.innerHTML = `${vc.name} <span style="font-size:11px;color:var(--text-secondary)">(${vc.userCount})</span>`;
+      div.addEventListener('click', () => toggleVoiceChannel(vc.id));
+      voiceChannelsList.appendChild(div);
+    });
+  }
+  
+  async function toggleVoiceChannel(channelId) {
+    if (currentVoiceChannel === channelId) {
+      // Выходим
+      leaveVoiceChannel();
+    } else {
+      // Выходим из предыдущего
+      if (currentVoiceChannel) leaveVoiceChannel();
+      // Заходим в новый
+      currentVoiceChannel = channelId;
+      socket.emit('join-voice', { channelId });
+      playJoinSound();
+      chatHeader.textContent = '🔊 ' + (voiceChannels.find(v => v.id === channelId)?.name || 'Голосовой канал');
+      messagesEl.innerHTML = '<div style="text-align:center;color:var(--text-secondary);margin-top:40px">Вы в голосовом канале. Говорите!</div>';
+      renderVoiceChannels();
+      document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+      currentDM = null;
+      currentChannel = null;
+    }
+  }
+  
+  function leaveVoiceChannel() {
+    if (currentVoiceChannel) {
+      socket.emit('leave-voice');
+      playLeaveSound();
+      // Закрываем все голосовые peer connections
+      Object.values(voicePeerConnections).forEach(pc => pc.close());
+      voicePeerConnections = {};
+      currentVoiceChannel = null;
+      renderVoiceChannels();
+      if (!currentDM && !currentChannel) {
+        switchChannel('general');
+      }
+    }
+  }
+  
+  // ==================== ЛС ====================
+  async function openDM(userId) {
+    currentDM = userId;
+    currentChannel = null;
+    if (currentVoiceChannel) leaveVoiceChannel();
+    
+    const user = users.find(u => u.id === userId);
+    if (user) chatHeader.textContent = '✉️ ' + user.username;
+    
+    document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.voice-channel-item').forEach(el => el.classList.remove('active'));
+    
+    // Загружаем ЛС сообщения
+    try {
+      const res = await fetch(`/api/dm/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const msgs = await res.json();
+      messagesEl.innerHTML = '';
+      msgs.forEach(msg => addMessageToDOM(msg, false));
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    } catch(e) { console.error(e); }
+  }
+  
+  // ==================== ПОЛЬЗОВАТЕЛИ ====================
   async function loadUsers() {
     try {
       const res = await fetch('/api/users');
       users = await res.json();
       renderUsers();
-    } catch(e) { console.error('Ошибка загрузки пользователей:', e); }
+    } catch(e) { console.error(e); }
   }
   
   function renderUsers() {
     usersList.innerHTML = '';
-    const online = users.filter(u => u.status !== 'offline');
-    const offline = users.filter(u => u.status === 'offline');
+    const online = users.filter(u => u.status !== 'offline' && u.id !== currentUser?.id);
+    const offline = users.filter(u => u.status === 'offline' && u.id !== currentUser?.id);
     
     [...online, ...offline].forEach(user => {
       const div = document.createElement('div');
@@ -765,9 +725,18 @@
           <span class="status-dot ${user.status}"></span>
         </div>
         <span class="user-item-name">${user.username}</span>
+        <button class="user-item-call" title="Позвонить" onclick="event.stopPropagation(); callUser('${user.id}')">📞</button>
       `;
+      div.addEventListener('click', () => openDM(user.id));
       usersList.appendChild(div);
     });
+  }
+  
+  function callUser(userId) {
+    if (callInProgress) return;
+    currentCallerId = userId;
+    playCallSound();
+    createOffer();
   }
   
   // ==================== ЗАГРУЗКА СООБЩЕНИЙ ====================
@@ -778,7 +747,7 @@
       messagesEl.innerHTML = '';
       msgs.forEach(msg => addMessageToDOM(msg, false));
       messagesEl.scrollTop = messagesEl.scrollHeight;
-    } catch(e) { console.error('Ошибка загрузки сообщений:', e); }
+    } catch(e) { console.error(e); }
   }
   
   function addMessageToDOM(msg, animate = true) {
@@ -802,7 +771,6 @@
       </div>
     `;
     
-    // Кнопки редактирования/удаления (только для своих сообщений)
     if (msg.userId === currentUser?.id) {
       const actions = document.createElement('div');
       actions.className = 'message-actions';
@@ -826,6 +794,7 @@
   // ==================== РЕДАКТИРОВАНИЕ / УДАЛЕНИЕ ====================
   function editMessage(msgId) {
     const msgEl = document.getElementById('msg-' + msgId);
+    if (!msgEl) return;
     const textEl = msgEl.querySelector('.message-text');
     const oldText = textEl.textContent;
     
@@ -874,19 +843,34 @@
     const text = messageInput.value.trim();
     if (!text) return;
     
-    socket.emit('send-message', { channelId: currentChannel, text });
+    if (currentDM) {
+      socket.emit('send-dm', { to: currentDM, text });
+    } else if (currentChannel) {
+      socket.emit('send-message', { channelId: currentChannel, text });
+    } else {
+      return;
+    }
+    
     messageInput.value = '';
     playNotificationSound();
   }
-  
-  // ==================== СОКЕТ СОБЫТИЯ ====================
+    // ==================== СОКЕТ СОБЫТИЯ ====================
   function setupSocketEvents() {
     socket.on('new-message', (msg) => {
-      if (msg.channelId === currentChannel) {
+      if (msg.channelId === currentChannel && !currentDM) {
         addMessageToDOM(msg, true);
-        if (msg.userId !== currentUser?.id) {
-          playNotificationSound();
-        }
+        if (msg.userId !== currentUser?.id) playNotificationSound();
+      }
+    });
+    
+    socket.on('new-dm', ({ from, message }) => {
+      if (currentDM === from || currentDM === message.userId) {
+        addMessageToDOM(message, true);
+        if (message.userId !== currentUser?.id) playNotificationSound();
+      }
+      if (message.userId !== currentUser?.id) {
+        const user = users.find(u => u.id === message.userId);
+        showNotification(`💬 <strong>${user?.username || message.username}</strong>: ${message.text.slice(0, 50)}`);
       }
     });
     
@@ -894,8 +878,8 @@
       const msgEl = document.getElementById('msg-' + messageId);
       if (msgEl) {
         msgEl.querySelector('.message-text').textContent = text;
-        const editedEl = msgEl.querySelector('.message-edited');
         if (edited) {
+          const editedEl = msgEl.querySelector('.message-edited');
           if (!editedEl) {
             const span = document.createElement('span');
             span.className = 'message-edited';
@@ -936,7 +920,56 @@
       renderChannels();
     });
     
-    // Звонки
+    // Голосовые каналы
+    socket.on('voice-users-update', ({ channelId, users: vcUsers }) => {
+      const vc = voiceChannels.find(v => v.id === channelId);
+      if (vc) {
+        vc.userCount = vcUsers.length;
+        renderVoiceChannels();
+      }
+    });
+    
+    socket.on('user-joined-voice', ({ userId, username }) => {
+      if (currentVoiceChannel) {
+        playJoinSound();
+        showNotification(`🔊 <strong>${username}</strong> зашёл в голосовой канал`);
+        // Создаём peer connection для нового пользователя
+        createVoicePeerConnection(userId);
+      }
+    });
+    
+    socket.on('user-left-voice', ({ userId }) => {
+      if (currentVoiceChannel) {
+        playLeaveSound();
+        // Закрываем peer connection
+        if (voicePeerConnections[userId]) {
+          voicePeerConnections[userId].close();
+          delete voicePeerConnections[userId];
+        }
+      }
+    });
+    
+    // WebRTC голосового канала
+    socket.on('voice-offer', async ({ from, offer }) => {
+      if (!currentVoiceChannel) return;
+      const pc = createVoicePeerConnection(from);
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('voice-answer', { channelId: currentVoiceChannel, to: from, answer });
+    });
+    
+    socket.on('voice-answer', async ({ from, answer }) => {
+      const pc = voicePeerConnections[from];
+      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    });
+    
+    socket.on('voice-ice', async ({ from, candidate }) => {
+      const pc = voicePeerConnections[from];
+      if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+    
+    // Звонки 1-на-1
     socket.on('call-offer', ({ from, offer, callerName }) => {
       if (callInProgress) return;
       currentCallerId = from;
@@ -967,46 +1000,74 @@
     });
   }
   
-  // ==================== UI СОБЫТИЯ ====================
-  function setupUIEvents() {
-    // Кнопка звонка
-    document.getElementById('call-btn').addEventListener('click', async () => {
-      if (callInProgress) return;
-      
-      const onlineUsers = users.filter(u => u.id !== currentUser?.id && u.status !== 'offline');
-      if (onlineUsers.length === 0) {
-        alert('Нет пользователей онлайн для звонка');
-        return;
-      }
-      
-      // Если один онлайн — звоним сразу
-      let targetId;
-      if (onlineUsers.length === 1) {
-        targetId = onlineUsers[0].id;
-      } else {
-        // Список для выбора
-        const list = onlineUsers.map((u, i) => `${i+1}. ${u.username}`).join('\n');
-        const choice = prompt('Кому звоним?\n\n' + list + '\n\nВведите номер:');
-        const idx = parseInt(choice) - 1;
-        if (isNaN(idx) || idx < 0 || idx >= onlineUsers.length) return;
-        targetId = onlineUsers[idx].id;
-      }
-      
-      currentCallerId = targetId;
-      playCallSound();
-      await createOffer();
+  // ==================== ГОЛОСОВЫЕ PEER CONNECTIONS ====================
+  async function createVoicePeerConnection(userId) {
+    if (voicePeerConnections[userId]) return voicePeerConnections[userId];
+    
+    if (!localStream) {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+        });
+      } catch(e) { return; }
+    }
+    
+    const pc = new RTCPeerConnection({ 
+      iceServers:[
+        {urls:'stun:stun.l.google.com:19302'},
+        {urls:'stun:stun1.l.google.com:19302'},
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+      ] 
     });
     
-    // Профиль в сайдбаре — смена статуса
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+    
+    pc.ontrack = (event) => {
+      if (event.streams[0]) {
+        const audio = new Audio();
+        audio.srcObject = event.streams[0];
+        audio.autoplay = true;
+        audio.play().catch(e => {});
+      }
+    };
+    
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        socket.emit('voice-ice', { channelId: currentVoiceChannel, to: userId, candidate: e.candidate });
+      }
+    };
+    
+    // Создаём offer (мы инициатор)
+    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+    await pc.setLocalDescription(offer);
+    socket.emit('voice-offer', { channelId: currentVoiceChannel, offer });
+    
+    voicePeerConnections[userId] = pc;
+    return pc;
+  }
+  
+  // ==================== UI СОБЫТИЯ ====================
+  function setupUIEvents() {
     document.getElementById('sidebar-profile').addEventListener('click', () => {
       document.getElementById('status-modal').classList.add('active');
     });
     
-    // Закрытие модалки статуса по клику вне
     document.getElementById('status-modal').addEventListener('click', (e) => {
       if (e.target === document.getElementById('status-modal')) {
         document.getElementById('status-modal').classList.remove('active');
       }
+    });
+    
+    document.getElementById('add-channel').addEventListener('click', () => {
+      const name = prompt('Название канала:');
+      if (!name?.trim()) return;
+      fetch('/api/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: name.trim() })
+      }).then(() => loadChannels());
     });
   }
   
@@ -1034,6 +1095,30 @@
     }
   }
   
+  async function uploadAvatar(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    try {
+      const res = await fetch('/api/avatar', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      
+      const data = await res.json();
+      currentUser.avatar = data.avatar;
+      updateSidebarProfile();
+      showNotification('✅ Аватар обновлён!');
+    } catch(e) {
+      console.error('Ошибка загрузки аватара:', e);
+      showNotification('❌ Ошибка загрузки');
+    }
+  }
+  
   function setUserStatus(status) {
     socket.emit('set-status', { status });
     document.getElementById('status-modal').classList.remove('active');
@@ -1045,19 +1130,17 @@
     notification.classList.add('show');
     setTimeout(() => notification.classList.remove('show'), 3000);
   }
-    // ==================== ЗВОНКИ ====================
+  
+  // ==================== ЗВОНКИ 1-на-1 ====================
   async function createOffer() {
     console.log('📤 Создаю WebRTC offer');
     
     if (!localStream) {
-      console.warn('⚠️ localStream отсутствует, запрашиваю...');
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ 
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
         });
-        console.log('✅ Микрофон получен');
       } catch(err) {
-        console.error('❌ Микрофон не получен:', err);
         alert('Ошибка микрофона: ' + err.message);
         endCall();
         return;
@@ -1071,45 +1154,22 @@
         iceServers:[
           {urls:'stun:stun.l.google.com:19302'},
           {urls:'stun:stun1.l.google.com:19302'},
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          }
+          { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
         ] 
       });
       
-      if (localStream && localStream.getTracks().length > 0) {
-        console.log('🎵 Добавляю треки:', localStream.getTracks().length);
-        localStream.getTracks().forEach(t => {
-          peerConnection.addTrack(t, localStream);
-        });
-      } else {
-        console.error('❌ Нет треков для добавления!');
-        alert('Нет доступа к микрофону');
-        endCall();
-        return;
-      }
+      localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
       
       peerConnection.ontrack = (event) => {
-        console.log('🎵 Получен удалённый аудиопоток');
         if (event.streams[0]) {
           if (remoteAudioElement) { remoteAudioElement.srcObject = null; remoteAudioElement.remove(); }
           remoteAudioElement = new Audio();
           remoteAudioElement.srcObject = event.streams[0];
           remoteAudioElement.autoplay = true;
           remoteAudioElement.volume = document.getElementById('remote-volume').value / 100;
-          remoteAudioElement.play().catch(e => console.error('Play error:', e));
+          remoteAudioElement.play().catch(e => {});
         }
       };
       
@@ -1118,7 +1178,6 @@
       };
       
       peerConnection.onconnectionstatechange = () => {
-        console.log('📡 Состояние:', peerConnection.connectionState);
         if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
           alert('Соединение потеряно');
           endCall();
@@ -1139,17 +1198,13 @@
   }
 
   async function handleOffer(from, offer) {
-    console.log('📨 Обработка offer от:', from);
     try {
       if (!localStream) {
-        console.log('🎤 Запрашиваю микрофон в handleOffer...');
         try {
           localStream = await navigator.mediaDevices.getUserMedia({ 
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
           });
-          console.log('✅ Микрофон получен, треков:', localStream.getAudioTracks().length);
         } catch(err) {
-          console.error('❌ Микрофон не получен:', err);
           alert('Ошибка микрофона: ' + err.message);
           return;
         }
@@ -1161,44 +1216,22 @@
         iceServers:[
           {urls:'stun:stun.l.google.com:19302'},
           {urls:'stun:stun1.l.google.com:19302'},
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          }
+          { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+          { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
         ] 
       });
       
-      if (localStream && localStream.getTracks().length > 0) {
-        console.log('🎵 Добавляю треки в handleOffer:', localStream.getTracks().length);
-        localStream.getTracks().forEach(t => {
-          peerConnection.addTrack(t, localStream);
-        });
-      } else {
-        console.error('❌ Нет треков!');
-        alert('Нет доступа к микрофону');
-        return;
-      }
+      localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
       
       peerConnection.ontrack = (event) => {
-        console.log('🎵 Получен аудиопоток');
         if (event.streams[0]) {
           if (remoteAudioElement) { remoteAudioElement.srcObject = null; remoteAudioElement.remove(); }
           remoteAudioElement = new Audio();
           remoteAudioElement.srcObject = event.streams[0];
           remoteAudioElement.autoplay = true;
           remoteAudioElement.volume = document.getElementById('remote-volume').value / 100;
-          remoteAudioElement.play().catch(e => console.error('Play error:', e));
+          remoteAudioElement.play().catch(e => {});
         }
       };
       
@@ -1207,7 +1240,6 @@
       };
       
       peerConnection.onconnectionstatechange = () => {
-        console.log('📡 Состояние:', peerConnection.connectionState);
         if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
           alert('Соединение потеряно');
           endCall();
@@ -1230,10 +1262,7 @@
 
   async function handleAnswer(from, answer) {
     try {
-      if (peerConnection) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-        console.log('✅ Answer установлен');
-      }
+      if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     } catch(e) { console.error('Answer error:', e); }
   }
 
@@ -1263,7 +1292,6 @@
   function toggleCallMute() {
     isMuted = !isMuted;
     if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
-    
     const btn = document.querySelector('.btn-mute');
     if (btn) {
       btn.textContent = isMuted ? '🔇 Вкл. микрофон' : '🎙️ Выкл. микрофон';
@@ -1276,8 +1304,6 @@
   }
 
   function endCall() {
-    console.log('📴 Завершение звонка');
-    
     if (peerConnection) { peerConnection.close(); peerConnection = null; }
     if (remoteAudioElement) { remoteAudioElement.srcObject = null; remoteAudioElement.remove(); remoteAudioElement = null; }
     if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }

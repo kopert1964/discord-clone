@@ -26,6 +26,7 @@ if (!fs.existsSync(path.join(__dirname, 'public', 'uploads'))) {
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const CHANNELS_FILE = path.join(DATA_DIR, 'channels.json');
 const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
+const VOICE_FILE = path.join(DATA_DIR, 'voice.json');
 
 // Загружаем данные из файлов
 let users = loadJSON(USERS_FILE, []);
@@ -34,6 +35,11 @@ let channels = loadJSON(CHANNELS_FILE, [
   { id: 'random', name: '🎲 Флудилка', createdBy: 'system', createdAt: Date.now() }
 ]);
 let messages = loadJSON(MESSAGES_FILE, []);
+let voiceChannels = loadJSON(VOICE_FILE, [
+  { id: 'voice-general', name: '🔊 Общий', users: [] },
+  { id: 'voice-gaming', name: '🎮 Игры', users: [] }
+]);
+let directMessages = {};
 
 function loadJSON(file, defaultData) {
   try {
@@ -187,6 +193,25 @@ app.get('/api/messages/:channelId', (req, res) => {
   res.json(channelMessages.slice(-100)); // последние 100 сообщений
 });
 
+// Получить голосовые каналы
+app.get('/api/voice-channels', (req, res) => {
+  res.json(voiceChannels.map(vc => ({ id: vc.id, name: vc.name, userCount: vc.users.length })));
+});
+
+// Получить ЛС между двумя пользователями
+app.get('/api/dm/:userId', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Нет токена' });
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const dmKey = [decoded.id, req.params.userId].sort().join('-');
+    res.json(directMessages[dmKey] || []);
+  } catch(e) {
+    res.status(401).json({ error: 'Неверный токен' });
+  }
+});
+
 // ==================== SOCKET.IO ====================
 io.on('connection', (socket) => {
   console.log('🔌 Подключён:', socket.id);
@@ -228,7 +253,7 @@ io.on('connection', (socket) => {
     };
     
     messages.push(message);
-    if (messages.length > 10000) messages = messages.slice(-5000); // Ограничение размера
+    if (messages.length > 10000) messages = messages.slice(-5000);
     saveJSON(MESSAGES_FILE, messages);
     
     io.emit('new-message', message);
@@ -263,7 +288,82 @@ io.on('connection', (socket) => {
     io.emit('user-status', { id: currentUser.id, status });
   });
   
-  // ==================== ЗВОНКИ (твой текущий код) ====================
+  // Присоединиться к голосовому каналу
+  socket.on('join-voice', ({ channelId }) => {
+    if (!currentUser) return;
+    
+    leaveAllVoiceChannels(socket);
+    
+    const vc = voiceChannels.find(c => c.id === channelId);
+    if (vc && !vc.users.find(u => u.userId === currentUser.id)) {
+      vc.users.push({ userId: currentUser.id, username: currentUser.username });
+      socket.join('voice-' + channelId);
+      socket.currentVoiceChannel = channelId;
+      
+      saveJSON(VOICE_FILE, voiceChannels);
+      io.emit('voice-users-update', { channelId, users: vc.users });
+      socket.to('voice-' + channelId).emit('user-joined-voice', { userId: currentUser.id, username: currentUser.username });
+    }
+  });
+  
+  // Выйти из голосового канала
+  socket.on('leave-voice', () => {
+    leaveAllVoiceChannels(socket);
+  });
+  
+  function leaveAllVoiceChannels(socket) {
+    voiceChannels.forEach(vc => {
+      const idx = vc.users.findIndex(u => u.userId === currentUser?.id);
+      if (idx !== -1) {
+        vc.users.splice(idx, 1);
+        socket.leave('voice-' + vc.id);
+        io.emit('voice-users-update', { channelId: vc.id, users: vc.users });
+        socket.to('voice-' + vc.id).emit('user-left-voice', { userId: currentUser?.id });
+      }
+    });
+    socket.currentVoiceChannel = null;
+    saveJSON(VOICE_FILE, voiceChannels);
+  }
+  
+  // WebRTC для голосовых каналов
+  socket.on('voice-offer', ({ channelId, offer }) => {
+    socket.to('voice-' + channelId).emit('voice-offer', { from: currentUser?.id, offer });
+  });
+  
+  socket.on('voice-answer', ({ channelId, to, answer }) => {
+    const target = findSocketByUserId(to);
+    if (target) target.emit('voice-answer', { from: currentUser?.id, answer });
+  });
+  
+  socket.on('voice-ice', ({ channelId, to, candidate }) => {
+    const target = findSocketByUserId(to);
+    if (target) target.emit('voice-ice', { from: currentUser?.id, candidate });
+  });
+  
+  // ЛС сообщения
+  socket.on('send-dm', ({ to, text }) => {
+    if (!currentUser || !text?.trim()) return;
+    
+    const dmKey = [currentUser.id, to].sort().join('-');
+    if (!directMessages[dmKey]) directMessages[dmKey] = [];
+    
+    const message = {
+      id: uuidv4(),
+      userId: currentUser.id,
+      username: currentUser.username,
+      avatar: currentUser.avatar,
+      text: text.trim(),
+      createdAt: Date.now()
+    };
+    
+    directMessages[dmKey].push(message);
+    
+    const target = findSocketByUserId(to);
+    if (target) target.emit('new-dm', { from: currentUser.id, message });
+    socket.emit('new-dm', { from: currentUser.id, message });
+  });
+  
+  // ==================== ЗВОНКИ 1-на-1 ====================
   socket.on('call-offer', ({ to, offer }) => {
     const targetSocket = findSocketByUserId(to);
     if (targetSocket) {
@@ -305,6 +405,7 @@ io.on('connection', (socket) => {
   
   // Отключение
   socket.on('disconnect', () => {
+    leaveAllVoiceChannels(socket);
     console.log('🔌 Отключён:', socket.id);
     if (currentUser) {
       currentUser.status = 'offline';
