@@ -779,6 +779,22 @@
     stopIncomingSound();
     document.getElementById('incoming-call').classList.remove('active');
     socket.emit('call-accept', { to: currentCallerId });
+    
+    // Принудительно запрашиваем микрофон
+    try {
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      localStream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+      });
+    } catch(e) {
+      console.error('Ошибка микрофона при приёме:', e);
+      endCall();
+      return;
+    }
+    
     if (incomingOffer) {
       await handleOffer(currentCallerId, incomingOffer);
       incomingOffer = null;
@@ -786,7 +802,7 @@
     showCallWindow('active');
     startTimer();
     startAudioIndicator();
-  }
+}
   
   function rejectIncomingCall() {
     stopIncomingSound();
@@ -1291,9 +1307,19 @@
   async function handleOffer(from, offer) {
     console.log('📨 Обработка offer от:', from);
     
+    // ПРИНУДИТЕЛЬНО запрашиваем микрофон для принимающего (телефон)
     try {
-      await ensureLocalStream();
+      console.log('🎤 handleOffer: запрашиваю микрофон...');
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      localStream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+      });
+      console.log('✅ handleOffer: микрофон получен, треки:', localStream.getAudioTracks().length);
     } catch(e) {
+      console.error('❌ handleOffer: ошибка микрофона:', e);
       socket.emit('call-reject', { to: from });
       return;
     }
@@ -1303,39 +1329,47 @@
       
       peerConnection = new RTCPeerConnection({ iceServers });
       
+      // Добавляем треки
       localStream.getTracks().forEach(t => {
-        console.log('➕ Добавляю трек:', t.kind);
+        console.log('➕ handleOffer: добавляю трек:', t.kind, t.readyState);
         peerConnection.addTrack(t, localStream);
       });
       
       peerConnection.ontrack = (event) => {
-        console.log('🎵 Получен удалённый аудиопоток');
+        console.log('🎵 handleOffer: получен удалённый поток, стримов:', event.streams.length);
         if (event.streams[0]) {
           if (remoteAudioElement) { remoteAudioElement.srcObject = null; remoteAudioElement.remove(); }
           remoteAudioElement = new Audio();
           remoteAudioElement.srcObject = event.streams[0];
           remoteAudioElement.autoplay = true;
           remoteAudioElement.volume = document.getElementById('remote-volume').value / 100;
-          remoteAudioElement.play().catch(e => console.error('Play error:', e));
+          remoteAudioElement.play().then(() => console.log('✅ handleOffer: аудио играет')).catch(e => console.error('handleOffer play error:', e));
         }
       };
       
       peerConnection.onicecandidate = (e) => {
-        if (e.candidate) socket.emit('call-ice', { to: from, candidate: e.candidate });
+        if (e.candidate) {
+          console.log('📤 handleOffer: ICE кандидат:', e.candidate.type);
+          socket.emit('call-ice', { to: from, candidate: e.candidate });
+        }
       };
       
       peerConnection.onconnectionstatechange = () => {
-        console.log('📡 Состояние:', peerConnection.connectionState);
+        console.log('📡 handleOffer: состояние:', peerConnection.connectionState);
         if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
           alert('Соединение потеряно');
           endCall();
         }
       };
       
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log('🧊 handleOffer: ICE состояние:', peerConnection.iceConnectionState);
+      };
+      
       await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
-      console.log('📤 Answer отправлен');
+      console.log('📤 handleOffer: Answer отправлен');
       
       socket.emit('call-answer', { to: from, answer });
       
@@ -1344,11 +1378,11 @@
       startTimer();
       startAudioIndicator();
     } catch(e) {
-      console.error('Handle offer error:', e);
+      console.error('handleOffer error:', e);
       alert('Ошибка: ' + e.message);
       endCall();
     }
-  }
+}
   
   async function handleAnswer(from, answer) {
     try {
