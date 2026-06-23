@@ -1486,12 +1486,33 @@ async function createOffer() {
   try {
     if (peerConnection) peerConnection.close();
     
-    peerConnection = new RTCPeerConnection({ 
-      iceServers:[
-        {urls:'stun:stun.l.google.com:19302'},
-        {urls:'stun:stun1.l.google.com:19302'}
-      ] 
-    });
+    var myPeerConnection = new RTCPeerConnection({
+  iceServers: [
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80",
+        username: "28793b0bc70d6f96e68cd4b2",
+        credential: "Sah/die5lEFpujE2",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80?transport=tcp",
+        username: "28793b0bc70d6f96e68cd4b2",
+        credential: "Sah/die5lEFpujE2",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:443",
+        username: "28793b0bc70d6f96e68cd4b2",
+        credential: "Sah/die5lEFpujE2",
+      },
+      {
+        urls: "turns:global.relay.metered.ca:443?transport=tcp",
+        username: "28793b0bc70d6f96e68cd4b2",
+        credential: "Sah/die5lEFpujE2",
+      },
+  ],
+});
     
     if (localStream) {
       localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
@@ -1536,9 +1557,33 @@ async function handleOffer(from, offer) {
   try {
     if (peerConnection) peerConnection.close();
     
-    peerConnection = new RTCPeerConnection({ 
-      iceServers:[{urls:'stun:stun.l.google.com:19302'}] 
-    });
+    var myPeerConnection = new RTCPeerConnection({
+  iceServers: [
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80",
+        username: "28793b0bc70d6f96e68cd4b2",
+        credential: "Sah/die5lEFpujE2",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80?transport=tcp",
+        username: "28793b0bc70d6f96e68cd4b2",
+        credential: "Sah/die5lEFpujE2",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:443",
+        username: "28793b0bc70d6f96e68cd4b2",
+        credential: "Sah/die5lEFpujE2",
+      },
+      {
+        urls: "turns:global.relay.metered.ca:443?transport=tcp",
+        username: "28793b0bc70d6f96e68cd4b2",
+        credential: "Sah/die5lEFpujE2",
+      },
+  ],
+});
     
     if (localStream) {
       localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
