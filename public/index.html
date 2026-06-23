@@ -1483,52 +1483,55 @@ async function startCall(socketId, username) {
 
 async function createOffer() {
   console.log('📤 Создаю WebRTC offer');
-   if (!localStream) {
-    console.error('❌ localStream отсутствует, запрашиваю заново');
+  
+  // ЖЁСТКО проверяем и получаем микрофон
+  if (!localStream) {
+    console.warn('⚠️ localStream отсутствует, запрашиваю...');
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ 
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
       });
-    } catch(e) {
-      console.error('Не могу получить микрофон:', e);
-      alert('Нет доступа к микрофону');
+      console.log('✅ Микрофон получен');
+    } catch(err) {
+      console.error('❌ Микрофон не получен:', err);
+      alert('Ошибка микрофона: ' + err.message);
       endCall();
       return;
     }
   }
-   try {
+
+  try {
     if (peerConnection) peerConnection.close();
     
-    var myPeerConnection = new RTCPeerConnection({
-  iceServers: [
-      {
-        urls: "stun:stun.relay.metered.ca:80",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80",
-        username: "28793b0bc70d6f96e68cd4b2",
-        credential: "Sah/die5lEFpujE2",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80?transport=tcp",
-        username: "28793b0bc70d6f96e68cd4b2",
-        credential: "Sah/die5lEFpujE2",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:443",
-        username: "28793b0bc70d6f96e68cd4b2",
-        credential: "Sah/die5lEFpujE2",
-      },
-      {
-        urls: "turns:global.relay.metered.ca:443?transport=tcp",
-        username: "28793b0bc70d6f96e68cd4b2",
-        credential: "Sah/die5lEFpujE2",
-      },
-  ],
-});
+    peerConnection = new RTCPeerConnection({ 
+      iceServers:[
+        {urls:'stun:stun.l.google.com:19302'},
+        {urls:'stun:stun1.l.google.com:19302'},
+        {
+          urls: 'turn:ca-turn.metered.ca:443?transport=tcp',
+          username: '28793b0bc70d6f96e68cd4b2',
+          credential: 'Sah/die5lEFpujE2'
+        },
+        {
+          urls: 'turn:ca-turn.metered.ca:443?transport=tcp',
+          username: '28793b0bc70d6f96e68cd4b2',
+          credential: 'Sah/die5lEFpujE2'
+        }
+      ] 
+    });
     
-    if (localStream) {
-      localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+    // Проверяем ещё раз перед добавлением
+    if (localStream && localStream.getTracks().length > 0) {
+      console.log('🎵 Добавляю треки:', localStream.getTracks().length);
+      localStream.getTracks().forEach(t => {
+        console.log('  - Добавляю трек:', t.kind);
+        peerConnection.addTrack(t, localStream);
+      });
+    } else {
+      console.error('❌ Нет треков для добавления! localStream:', localStream);
+      alert('Нет доступа к микрофону');
+      endCall();
+      return;
     }
     
     peerConnection.ontrack = (event) => {
@@ -1562,7 +1565,10 @@ async function createOffer() {
     callInProgress = true;
     startTimer();
     showCallWindow('active');
-  } catch(e) { console.error('Offer error:', e); }
+  } catch(e) { 
+    console.error('Offer error:', e); 
+    alert('Ошибка создания звонка: ' + e.message);
+  }
 }
 
 async function handleOffer(from, offer) {
@@ -1655,27 +1661,17 @@ async function acceptCall() {
   playConnectSound();
   
   try {
-    // ВСЕГДА запрашиваем микрофон заново
-    console.log('🎤 Запрашиваю микрофон...');
+    console.log('🎤 Запрашиваю микрофон в acceptCall...');
     localStream = await navigator.mediaDevices.getUserMedia({ 
-      audio: { 
-        echoCancellation: true, 
-        noiseSuppression: true, 
-        autoGainControl: true 
-      } 
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
     });
-    console.log('✅ Микрофон получен, треки:', localStream.getAudioTracks().length);
+    console.log('✅ Микрофон получен, треков:', localStream.getAudioTracks().length);
     
-    socket.emit('call-accept', { to: currentCallerId });
-    
-    // Небольшая задержка чтобы сигнал успел дойти
-    setTimeout(() => {
-      createOffer();
-    }, 300);
-    
+    socket.emit('call-accept',{to:currentCallerId});
+    createOffer();
   } catch(e) {
     console.error('Accept error:', e);
-    alert('❌ Ошибка доступа к микрофону: ' + e.message);
+    alert('❌ Ошибка: ' + e.message);
     endCall();
   }
 }
