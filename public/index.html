@@ -285,16 +285,16 @@
   let voiceSpeakingInterval = null;
   
   const iceServers = [
-    { urls: 'stun:stun.l.google.com:19302' },
     {
-        urls: 'turn:global.relay.metered.ca:80?transport=udp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
+        urls: 'stun:stun.l.google.com:19302'
     },
     {
-        urls: 'turn:global.relay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
+        urls: [
+            'turn:global.turn.twilio.com:3478?transport=tcp',
+            'turn:global.turn.twilio.com:443?transport=tcp'
+        ],
+        username: 'f4b4035e6e2c1a2b4c1f8e9d0a7b6c5d4e3f2a1b',
+        credential: 'c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0'
     }
 ];
   
