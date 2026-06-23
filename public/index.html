@@ -286,11 +286,17 @@
   
   const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-  ];
+    {
+        urls: 'turns:relay1.expressturn.com:443?transport=tcp',
+        username: 'efree',
+        credential: 'efree'
+    },
+    {
+        urls: 'turns:ca-turn.metered.ca:443?transport=tcp',
+        username: 'efree',
+        credential: 'efree'
+    }
+];
   
   // DOM элементы
   const authOverlay = document.getElementById('auth-overlay');
