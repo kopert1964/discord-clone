@@ -1504,22 +1504,26 @@ async function createOffer() {
     if (peerConnection) peerConnection.close();
     
     peerConnection = new RTCPeerConnection({ 
-      iceServers:[
-        {urls:'stun:stun.l.google.com:19302'},
-        {urls:'stun:stun1.l.google.com:19302'},
-        {
-          urls: 'turn:ca-turn.metered.ca:443?transport=tcp',
-          username: '28793b0bc70d6f96e68cd4b2',
-          credential: 'Sah/die5lEFpujE2'
-        },
-        {
-          urls: 'turn:ca-turn.metered.ca:443?transport=tcp',
-          username: '28793b0bc70d6f96e68cd4b2',
-          credential: 'Sah/die5lEFpujE2'
-        }
-      ] 
-    });
-    
+  iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'},
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
+  ] 
+});
     // Проверяем ещё раз перед добавлением
     if (localStream && localStream.getTracks().length > 0) {
       console.log('🎵 Добавляю треки:', localStream.getTracks().length);
@@ -1592,21 +1596,26 @@ async function handleOffer(from, offer) {
     if (peerConnection) peerConnection.close();
     
     peerConnection = new RTCPeerConnection({ 
-      iceServers:[
-        {urls:'stun:stun.l.google.com:19302'},
-        {urls:'stun:stun1.l.google.com:19302'},
-        {
-          urls: 'turn:ca-turn.metered.ca:443?transport=tcp',
-          username: '3cebf846bb9ab8db0a884b07',
-          credential: '7WWBAwbAw52ajcNL'
-        },
-        {
-          urls: 'turn:ca-turn.metered.ca:443?transport=udp',
-          username: '3cebf846bb9ab8db0a884b07',
-          credential: '7WWBAwbAw52ajcNL'
-        }
-      ] 
-    });
+  iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'},
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
+  ] 
+});
     
     if (localStream && localStream.getTracks().length > 0) {
       console.log('🎵 Добавляю треки в handleOffer:', localStream.getTracks().length);
